@@ -56,20 +56,27 @@ def get_observation_model(
         formula_obs = re.sub(nan_pat, "", str(observable[OBSERVABLE_FORMULA]))
         formula_noise = re.sub(nan_pat, "", str(observable[NOISE_FORMULA]))
         observables[oid] = {"name": name, "formula": formula_obs}
+        ## new
+        formula_noise = sp.sympify(formula_noise, locals=_clash).subs(
+            sp.sympify(formula_obs, locals=_clash), sp.Symbol(oid)
+        )
         sigmas[oid] = formula_noise
 
     # PEtab does currently not allow observables in noiseFormula and AMICI
     #  cannot handle states in sigma expressions. Therefore, where possible,
     #  replace species occurring in error model definition by observableIds.
-    replacements = {
-        sp.sympify(observable["formula"], locals=_clash): sp.Symbol(
-            observable_id
-        )
-        for observable_id, observable in observables.items()
-    }
-    for observable_id, formula in sigmas.items():
-        repl = sp.sympify(formula, locals=_clash).subs(replacements)
-        sigmas[observable_id] = str(repl)
+    # replacements = {
+    #     sp.sympify(observable["formula"], locals=_clash): sp.Symbol(
+    #         observable_id
+    #     )
+    #     for observable_id, observable in observables.items()
+    # }
+    # for observable_id, formula in sigmas.items():
+    #     repl = sp.sympify(formula, locals=_clash).subs(replacements)
+    #     sigmas[observable_id] = str(repl)
+    # for observable_id, formula in sigmas.items():
+    #     repl = sp.sympify(formula, locals=_clash).subs(sp.sympify(formula, locals=_clash), sp.Symbol(observable_id))
+    #     sigmas[observable_id] = str(repl)
 
     noise_distrs = petab_noise_distributions_to_amici(observable_df)
 
