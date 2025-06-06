@@ -85,7 +85,17 @@ def get_extensions():
     #  to use artifacts from other extensions here. `${build_dir}` will
     #  be replaced by the actual path by `AmiciBuildCMakeExtension`
     #  before being passed to CMake.
-    cmake_prefix_path += "${build_dir}/amici"
+    cmake_prefix_path += "${build_dir}/amici;"
+
+    try:
+        import scipy_openblas64
+
+        cmake_prefix_path += (
+            f"{scipy_openblas64.get_lib_dir()}/cmake/openblas;"
+        )
+    except ImportError:
+        pass
+
     # SUNDIALS
     sundials = CMakeExtension(
         name="sundials",

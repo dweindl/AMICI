@@ -72,8 +72,22 @@ elseif(
     else()
       set(BLA_VENDOR "All")
     endif()
-
   endif()
+
+  # Try scipy-openblas64 package, assuming CMAKE_PREFIX_PATH is set to
+  # the directory containing the package configuration.
+  if(NOT DEFINED BLA_VENDOR OR BLA_VENDOR STREQUAL "All")
+    message(STATUS "Trying to find OpenBLAS in CONFIG mode")
+    find_package(OpenBLAS CONFIG)
+    if(OpenBLAS_FOUND)
+      message(STATUS "Found OpenBLAS in CONFIG mode (OpenBLAS_DIR=${OpenBLAS_DIR})")
+      set(BLAS_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIRS})
+      set(BLAS_LIBRARIES ${OpenBLAS_LIBRARIES})
+      list(APPEND BLAS_DEFINES "BLAS_PREFIX=scipy_cblas_" "BLAS_SUFFIX=64_")
+      set(BLAS_FOUND TRUE)
+    endif()
+  endif()
+
   if(NOT BLAS_FOUND)
     message(STATUS "Trying FindBLAS with BLA_VENDOR=${BLA_VENDOR}")
     find_package(BLAS)
@@ -81,6 +95,7 @@ elseif(
       message(STATUS "Found BLAS via FindBLAS")
     endif()
   endif()
+
   if(NOT BLAS_FOUND)
     # Nothing specified by the user and FindBLAS didn't find anything; let's try
     # if cblas is available on the system paths.
@@ -98,7 +113,9 @@ if(NOT TARGET BLAS::BLAS)
   add_library(BLAS INTERFACE)
   set_target_properties(
     BLAS PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${BLAS_INCLUDE_DIRS}"
-                    INTERFACE_LINK_LIBRARIES "${BLAS_LIBRARIES}")
+                    INTERFACE_LINK_LIBRARIES "${BLAS_LIBRARIES}"
+                    INTERFACE_COMPILE_DEFINITIONS "${BLAS_DEFINES}"
+                  )
   add_library(BLAS::BLAS ALIAS BLAS)
   if("${PROJECT_NAME}" STREQUAL "amici")
     install(TARGETS BLAS EXPORT BLAS)
