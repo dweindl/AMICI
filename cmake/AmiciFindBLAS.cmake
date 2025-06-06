@@ -83,6 +83,8 @@ elseif(
       message(STATUS "Found OpenBLAS in CONFIG mode (OpenBLAS_DIR=${OpenBLAS_DIR})")
       set(BLAS_INCLUDE_DIRS ${OpenBLAS_INCLUDE_DIRS})
       set(BLAS_LIBRARIES ${OpenBLAS_LIBRARIES})
+      # fix incorrect path, replace /bin/ by /lib/
+      string(REPLACE "/bin/" "/lib/" BLAS_LIBRARIES "${BLAS_LIBRARIES}")
       list(APPEND BLAS_DEFINES "BLAS_PREFIX=scipy_cblas_" "BLAS_SUFFIX=64_")
       set(BLAS_FOUND TRUE)
     endif()
