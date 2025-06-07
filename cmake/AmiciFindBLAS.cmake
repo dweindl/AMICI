@@ -85,6 +85,8 @@ elseif(
       set(BLAS_LIBRARIES ${OpenBLAS_LIBRARIES})
       # fix incorrect path, replace /bin/ by /lib/
       string(REPLACE "/bin/" "/lib/" BLAS_LIBRARIES "${BLAS_LIBRARIES}")
+      string(REPLACE "/libscipy_openblas64_.dll" "/libscipy_openblas64_.lib" BLAS_LIBRARIES "${BLAS_LIBRARIES}")
+
       list(APPEND BLAS_DEFINES "BLAS_PREFIX=scipy_cblas_" "BLAS_SUFFIX=64_")
       set(BLAS_FOUND TRUE)
     endif()
