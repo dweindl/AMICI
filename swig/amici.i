@@ -345,7 +345,6 @@ from __future__ import annotations
 
 import sys
 import os
-from pathlib import Path
 
 if sys.platform == 'win32' and (dll_dirs := os.environ.get('AMICI_DLL_DIRS')):
     for dll_dir in dll_dirs.split(os.pathsep):
@@ -361,12 +360,7 @@ try:
     import scipy_openblas64
 
     if sys.platform == 'win32':
-        libdir = Path(scipy_openblas64.get_lib_dir())
-        if not libdir.isdirectory():
-            # replace bin/ by lib/
-            libdir = libdir.parent / 'lib'
-            assert libdir.is_dir(), f"Expected {libdir} to be a directory"
-        os.add_dll_directory(scipy_openblas64.get_lib_dir())
+      os.add_dll_directory(scipy_openblas64.get_lib_dir())
     else:
         os.environ["LD_LIBRARY_PATH"]  = os.pathsep.join(
             [
@@ -427,7 +421,7 @@ __all__ = [
     x
     for x in dir(sys.modules[__name__])
     if not x.startswith('_')
-    and x not in {"np", "sys", "os", "numpy", "IntEnum", "enum", "pi", "TYPE_CHECKING", "Iterable", "Sequence", "Path"}
+    and x not in {"np", "sys", "os", "numpy", "IntEnum", "enum", "pi", "TYPE_CHECKING", "Iterable", "Sequence"}
 ]
 
 %}
