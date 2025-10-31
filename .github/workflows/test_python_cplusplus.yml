@@ -302,7 +302,7 @@ jobs:
 
   macos_python:
     name: Tests MacOS Python
-    runs-on: macos-latest
+    runs-on: macos-14
     env:
       PYTHONFAULTHANDLER: "1"
 
