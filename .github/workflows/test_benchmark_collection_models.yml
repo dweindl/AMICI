@@ -132,7 +132,7 @@ jobs:
         &&  python3 -m pip install -U sympy \
         &&  python3 -m pip install git+https://github.com/ICB-DCM/fiddy.git@amici100
 
-    - run: pip uninstall -y diffrax && pip install git+https://github.com/patrick-kidger/diffrax@dev # TODO FIXME https://github.com/patrick-kidger/diffrax/issues/654 + event dirs
+    - run: pip uninstall -y diffrax && pip install git+https://github.com/patrick-kidger/diffrax@main # TODO FIXME https://github.com/patrick-kidger/diffrax/issues/654 + event dirs
 
     - name: Download benchmark collection
       run: |
