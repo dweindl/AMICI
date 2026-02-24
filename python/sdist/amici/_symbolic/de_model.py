@@ -2679,11 +2679,16 @@ class DEModel:
     def has_implicit_event_assignments(self) -> bool:
         """
         Checks whether the model has event assignments with implicit triggers
+        (i.e. triggers that are not time based).
 
         :return:
             boolean indicating if event assignments with implicit triggers are present
         """
-        return any(event.updates_state and not event.has_explicit_trigger_times({}) for event in self._events)
+        fixed_symbols = set([k._symbol for k in self._fixed_parameters])
+        allowed_symbols = fixed_symbols | {amici_time_symbol}
+        # TODO: update to use has_explicit_trigger_times once 
+        # https://github.com/AMICI-dev/AMICI/issues/3126 is resolved
+        return any(event.updates_state and event._has_implicit_triggers(allowed_symbols) for event in self._events)
 
     def toposort_expressions(
         self, reorder: bool = True

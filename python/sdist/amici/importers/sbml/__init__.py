@@ -438,6 +438,7 @@ class SbmlImporter:
         self,
         model_name: str,
         output_dir: str | Path = None,
+        fixed_parameters: Iterable[str] = None,
         observation_model: list[MeasurementChannel] = None,
         verbose: int | bool = logging.ERROR,
         compute_conservation_laws: bool = True,
@@ -464,6 +465,9 @@ class SbmlImporter:
 
         :param output_dir:
             Directory where the generated model package will be stored.
+
+        :param fixed_parameters:
+            SBML Ids to be excluded from sensitivity analysis
 
         :param observation_model:
             The different measurement channels that make up the observation
@@ -513,6 +517,7 @@ class SbmlImporter:
         set_log_level(logger, verbose)
 
         ode_model = self._build_ode_model(
+            fixed_parameters=fixed_parameters,
             observation_model=observation_model,
             verbose=verbose,
             compute_conservation_laws=compute_conservation_laws,
@@ -1908,6 +1913,7 @@ class SbmlImporter:
                     "initial_value": not initial_value,
                     "use_values_from_trigger_time": use_trig_val,
                     "priority": self._sympify(event.getPriority()),
+                    "is_negative_event": True,
                 }
 
     @log_execution_time("processing observation model", logger)
