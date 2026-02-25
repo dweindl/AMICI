@@ -71,8 +71,8 @@ def _test_case(case, model_type, version, jax):
     )
 
     if jax:
-        from amici.jax import petab_simulate, run_simulations
-        from amici.jax.petab import DEFAULT_CONTROLLER_SETTINGS
+        from amici.sim.jax import petab_simulate, run_simulations
+        from amici.sim.jax.petab import DEFAULT_CONTROLLER_SETTINGS
 
         steady_state_event = diffrax.steady_state_event(rtol=1e-6, atol=1e-6)
 

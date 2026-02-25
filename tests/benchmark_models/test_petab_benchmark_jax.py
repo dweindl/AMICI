@@ -10,7 +10,7 @@ import pytest
 from amici.importers.petab.v1 import (
     import_petab_problem,
 )
-from amici.jax.petab import run_simulations
+from amici.sim.jax.petab import run_simulations
 from amici.sim.sundials import SensitivityMethod, SensitivityOrder
 from amici.sim.sundials.petab.v1 import (
     LLH,

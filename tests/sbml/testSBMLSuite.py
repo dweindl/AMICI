@@ -23,7 +23,7 @@ import numpy as np
 import optimistix
 import pandas as pd
 import pytest
-from amici.jax.petab import (
+from amici.sim.jax.petab import (
     DEFAULT_CONTROLLER_SETTINGS,
     DEFAULT_ROOT_FINDER_SETTINGS,
 )
@@ -240,7 +240,7 @@ def jax_sensitivity_check(
                 diffrax.DirectAdjoint(),
                 diffrax.SteadyStateEvent(),
                 2**10,
-                ret=amici.jax.ReturnValue.x,
+                ret=amici.sim.jax.ReturnValue.x,
             )
             return x
 

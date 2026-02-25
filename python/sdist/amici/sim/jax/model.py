@@ -16,7 +16,7 @@ import jax.numpy as jnp
 import jaxtyping as jt
 from optimistix import AbstractRootFinder
 
-from ._simulation import _apply_event_assignments, eq, solve
+from amici.sim.jax._simulation import _apply_event_assignments, eq, solve
 
 
 class ReturnValue(enum.Enum):

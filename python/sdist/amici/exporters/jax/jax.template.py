@@ -1,16 +1,16 @@
 # ruff: noqa: F401, F821, F841
 from pathlib import Path
 
-import equinox as eqx
+import equinox as eqx  # noqa: F401
 import jax.numpy as jnp
-import jax.random as jr
-import jaxtyping as jt
-from interpax import interp1d
-from jax.numpy import inf as oo
-from jax.numpy import nan as nan
+import jax.random as jr  # noqa: F401
+import jaxtyping as jt  # noqa: F401
+from interpax import interp1d  # noqa: F401
+from jax.numpy import inf as oo  # noqa: F401
+from jax.numpy import nan as nan  # noqa: F401
 
-from amici import _module_from_path
-from amici.jax.model import JAXModel, safe_div, safe_log
+from amici import _module_from_path  # noqa: F401
+from amici.sim.jax.model import JAXModel, safe_div, safe_log  # noqa: F401
 
 TPL_NET_IMPORTS
 

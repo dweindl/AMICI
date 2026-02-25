@@ -18,19 +18,17 @@ from pathlib import Path
 
 import sympy as sp
 
-from amici import (
-    amiciModulePath,
-)
 from amici._symbolic.de_model import DEModel
 from amici._symbolic.sympy_utils import (
     _monkeypatch_sympy,
 )
+from amici.exporters.jax.nn import generate_equinox
 from amici.exporters.sundials.de_export import is_valid_identifier
 from amici.exporters.template import apply_template
-from amici.jax.jaxcodeprinter import AmiciJaxCodePrinter, _jnp_array_str
-from amici.jax.model import JAXModel
-from amici.jax.nn import generate_equinox
 from amici.logging import get_logger, log_execution_time, set_log_level
+from amici.sim.jax.model import JAXModel
+
+from .jaxcodeprinter import AmiciJaxCodePrinter, _jnp_array_str
 
 #: python log manager
 logger = get_logger(__name__, logging.ERROR)
@@ -303,7 +301,7 @@ class ODEExporter:
         }
 
         apply_template(
-            Path(amiciModulePath) / "jax" / "jax.template.py",
+            Path(__file__).parent / "jax.template.py",
             self.model_path / "__init__.py",
             tpl_data,
         )

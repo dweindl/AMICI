@@ -84,7 +84,7 @@ def _test_case(case, model_type, version, jax):
         jax=jax,
     )
     if jax:
-        from amici.jax import petab_simulate, run_simulations
+        from amici.sim.jax import petab_simulate, run_simulations
 
         steady_state_event = diffrax.steady_state_event(rtol=1e-6, atol=1e-6)
         jax_problem = (

@@ -8,7 +8,7 @@ pytest.importorskip("jax")
 pytest.importorskip("equinox")
 
 import pytest
-from amici.jax.nn import (
+from amici.exporters.jax.nn import (
     _format_function_call,
     _generate_forward,
     _process_activation_call,
@@ -229,7 +229,7 @@ class TestProcessActivationCall:
         node.kwargs = {}
 
         fun_str = _process_activation_call(node)
-        assert fun_str == "amici.jax.tanhshrink"
+        assert fun_str == "amici.export.jax.tanhshrink"
 
     def test_hardtanh_valid_params(self):
         """Test hardtanh with valid default parameters."""

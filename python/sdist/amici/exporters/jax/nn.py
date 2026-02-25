@@ -4,8 +4,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 from amici import amiciModulePath
-
-from ..exporters.template import apply_template
+from amici.exporters.template import apply_template
 
 
 class Flatten(eqx.Module):
@@ -185,7 +184,7 @@ def _generate_layer(layer: "Layer", indent: int, ilayer: int) -> str:  # noqa: F
     layer_map = {
         "Dropout1d": "eqx.nn.Dropout",
         "Dropout2d": "eqx.nn.Dropout",
-        "Flatten": "amici.jax.Flatten",
+        "Flatten": "amici.export.jax.Flatten",
     }
 
     # mapping of keyword argument names in sciml yaml format to equinox/custom amici implementations
@@ -321,9 +320,9 @@ def _process_activation_call(node: "Node") -> str:  # noqa: F821
         "hardtanh": "jax.nn.hard_tanh",
         "hardsigmoid": "jax.nn.hard_sigmoid",
         "hardswish": "jax.nn.hard_swish",
-        "tanhshrink": "amici.jax.tanhshrink",
+        "tanhshrink": "amici.export.jax.tanhshrink",
         "softsign": "jax.nn.soft_sign",
-        "cat": "amici.jax.cat",
+        "cat": "amici.export.jax.cat",
     }
 
     # Validate hardtanh parameters

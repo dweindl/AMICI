@@ -23,8 +23,8 @@ import amici
 from amici import get_model_dir
 from amici._symbolic import DEModel, Event
 from amici.importers.utils import MeasurementChannel, amici_time_symbol
-from amici.jax.petab import JAXProblem
 from amici.logging import get_logger
+from amici.sim.jax.petab import JAXProblem
 
 from .v1.sbml_import import _add_global_parameter
 

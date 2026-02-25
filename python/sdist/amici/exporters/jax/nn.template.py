@@ -1,11 +1,6 @@
 # ruff: noqa: F401, F821, F841
 import equinox as eqx
-import jax
-import jax.nn
-import jax.numpy as jnp
 import jax.random as jr
-
-import amici.jax.nn
 
 
 class TPL_MODEL_ID(eqx.Module):
