@@ -147,7 +147,7 @@ def pysb2jax(
         pysb_model_has_obs_and_noise=pysb_model_has_obs_and_noise,
     )
 
-    from amici.jax.ode_export import ODEExporter
+    from amici.exporters.jax.ode_export import ODEExporter
 
     exporter = ODEExporter(
         ode_model,

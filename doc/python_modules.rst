@@ -15,7 +15,7 @@ AMICI Python API
    amici.importers.petab
    amici.importers.petab.v1
    amici.importers.utils
-   amici.jax
+   amici.sim.jax
    amici.sim.sundials
    amici.sim.sundials.plotting
    amici.sim.sundials.gradient_check

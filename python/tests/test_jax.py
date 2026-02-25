@@ -4,7 +4,6 @@ import amici
 import pytest
 
 pytest.importorskip("jax")
-import amici.jax
 import diffrax
 import jax
 import jax.numpy as jnp
@@ -15,7 +14,7 @@ from amici import MeasurementChannel as MC
 from amici import import_model_module
 from amici.importers.petab.v1 import import_petab_problem
 from amici.importers.pysb import pysb2amici, pysb2jax
-from amici.jax import JAXProblem, ReturnValue, run_simulations
+from amici.sim.jax import JAXProblem, ReturnValue, run_simulations
 from amici.sim.sundials import (
     ExpData,
     SensitivityMethod,
@@ -342,8 +341,8 @@ def test_time_dependent_discontinuity(tmp_path):
 
     from amici.importers.antimony import antimony2sbml
     from amici.importers.sbml import SbmlImporter
-    from amici.jax._simulation import solve
-    from amici.jax.petab import DEFAULT_CONTROLLER_SETTINGS
+    from amici.sim.jax._simulation import solve
+    from amici.sim.jax.petab import DEFAULT_CONTROLLER_SETTINGS
 
     ant_model = """
     model time_disc
@@ -408,8 +407,8 @@ def test_time_dependent_discontinuity_equilibration(tmp_path):
 
     from amici.importers.antimony import antimony2sbml
     from amici.importers.sbml import SbmlImporter
-    from amici.jax._simulation import eq
-    from amici.jax.petab import DEFAULT_CONTROLLER_SETTINGS
+    from amici.sim.jax._simulation import eq
+    from amici.sim.jax.petab import DEFAULT_CONTROLLER_SETTINGS
 
     ant_model = """
     model time_disc_eq

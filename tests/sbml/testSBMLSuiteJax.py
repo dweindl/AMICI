@@ -12,7 +12,7 @@ import numpy as np
 import optimistix
 import pandas as pd
 import pytest
-from amici.jax.petab import DEFAULT_CONTROLLER_SETTINGS
+from amici.sim.jax.petab import DEFAULT_CONTROLLER_SETTINGS
 from amici.sim.sundials import AMICI_SUCCESS
 from utils import (
     find_model_file,
@@ -87,7 +87,7 @@ def run_jax_simulation(model, importer, ts, atol, rtol, tol_factor=1e2):
         diffrax.DirectAdjoint(),
         diffrax.SteadyStateEvent(),
         2**10,
-        ret=amici.jax.ReturnValue.x,
+        ret=amici.sim.jax.ReturnValue.x,
     )
     y = jax.vmap(
         lambda t, x_solver, x_rdata, hs: model._y(

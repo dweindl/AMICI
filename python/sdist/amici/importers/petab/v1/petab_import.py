@@ -47,7 +47,7 @@ def import_petab_problem(
     non_estimated_parameters_as_constants=True,
     jax=False,
     **kwargs,
-) -> "amici.sim.sundials.Model | amici.jax.JAXProblem":
+) -> "amici.sim.sundials.Model | amici.sim.jax.JAXProblem":
     """
     Create an AMICI model for a PEtab problem.
 
@@ -75,7 +75,7 @@ def import_petab_problem(
 
     :param jax:
         Whether to create a JAX-based problem. If ``True``, returns a
-        :class:`amici.jax.JAXProblem` instance. If ``False``, returns a
+        :class:`amici.sim.jax.JAXProblem` instance. If ``False``, returns a
         standard AMICI model.
 
     :param kwargs:
@@ -255,7 +255,7 @@ def import_petab_problem(
     )
 
     if jax:
-        from amici.jax import JAXProblem
+        from amici.sim.jax import JAXProblem
 
         model = model_module.Model()
 

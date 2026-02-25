@@ -2499,7 +2499,8 @@ class DEModel:
         orig_obs = tuple([s.get_sym() for s in self._observables])
         for net_id, net in hybridization.items():
             if net["static"]:
-                continue  # do not integrate into ODEs, handle in amici.jax.petab
+                # do not integrate into ODEs, handle in amici.sim.jax.petab
+                continue
             inputs = [
                 comp
                 for comp in self._components

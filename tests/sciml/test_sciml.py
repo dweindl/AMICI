@@ -13,12 +13,9 @@ import numpy as np
 import pandas as pd
 import petab.v1 as petab
 import pytest
+from amici.exporters.jax import generate_equinox
 from amici.importers.petab.v1 import import_petab_problem
-from amici.jax import (
-    generate_equinox,
-    petab_simulate,
-    run_simulations,
-)
+from amici.sim.jax import petab_simulate, run_simulations
 from petab_sciml import NNModelStandard
 from yaml import safe_load
 

@@ -526,7 +526,7 @@ class SbmlImporter:
             hybridization=hybridization,
         )
 
-        from amici.jax.ode_export import ODEExporter
+        from amici.exporters.jax.ode_export import ODEExporter
 
         exporter = ODEExporter(
             ode_model,
