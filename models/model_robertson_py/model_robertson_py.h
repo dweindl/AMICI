@@ -512,7 +512,7 @@ class Model_model_robertson_py : public amici::Model_DAE {
      * @return AMICI version string
      */
     std::string get_amici_version() const override {
-        return "1.0.0.dev";
+        return "1.0.1.dev";
     }
 
     /**
@@ -520,7 +520,7 @@ class Model_model_robertson_py : public amici::Model_DAE {
      * @return AMICI git commit hash
      */
     std::string get_amici_commit() const override {
-        return "2b036e909775bc4645c617839fb23d3ed5f07421";
+        return "39afcefa103c861d4efecc0d15196bab302eba69";
     }
 
     bool has_quadratic_llh() const override {
