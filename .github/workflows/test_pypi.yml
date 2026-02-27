@@ -42,5 +42,5 @@ jobs:
 
       - run: pip install --upgrade pip
       - run: pip install -v amici
-      - run: python -c "from amici import _amici; print(_amici)"
+      - run: python -c "from amici._installation import _amici; print(_amici)"
       - run: python -m amici
