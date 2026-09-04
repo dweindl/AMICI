@@ -2,19 +2,18 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "p.h"
-#include "k.h"
-#include "y.h"
-#include "sigmay.h"
-#include "my.h"
 
 namespace amici {
 namespace model_model_neuron_py {
 
 void dJydsigma_model_neuron_py(realtype *dJydsigma, const int iy, const realtype *p, const realtype *k, const realtype *y, const realtype *sigmay, const realtype *my){
+    const realtype y1_ = y[0];
+    const realtype sigma_y1_ = sigmay[0];
+    const realtype my1_ = my[0];
+
     switch(iy) {
         case 0:
-            dJydsigma[0] = 1.0/sigma_y1 - 1.0*std::pow(-my1 + y1, 2)/std::pow(sigma_y1, 3);
+            dJydsigma[0] = 1.0/sigma_y1_ - 1.0*std::pow(-my1_ + y1_, 2)/std::pow(sigma_y1_, 3);
             break;
     }
 }

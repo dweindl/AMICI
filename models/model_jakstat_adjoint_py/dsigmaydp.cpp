@@ -2,9 +2,6 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "p.h"
-#include "k.h"
-#include "y.h"
 
 namespace amici {
 namespace model_model_jakstat_adjoint_py {

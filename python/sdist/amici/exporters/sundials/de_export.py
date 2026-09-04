@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 from typing import (
     Literal,
@@ -219,7 +220,12 @@ class DEExporter:
         self.model: DEModel = de_model
         self._code_printer.known_functions.update(
             splines._spline_user_functions(
-                self.model._splines, self._get_index("p")
+                self.model._splines,
+                {
+                    self._code_printer.mangle_identifier(name): index
+                    for name, index in self._get_index("p").items()
+                },
+                self._code_printer.mangle_identifier,
             )
         )
 
@@ -286,21 +292,6 @@ class DEExporter:
                     )
                     raise
 
-        for name in self.model.sym_names():
-            # only generate for those that have nontrivial implementation,
-            # check for both basic variables (not in functions) and function
-            # computed values
-            if (
-                (
-                    name in self.functions
-                    and not self.functions[name].body
-                    and name not in nobody_functions
-                )
-                or name not in self.functions
-            ) and len(self.model.sym(name)) == 0:
-                continue
-            self._write_index_files(name)
-
         self._write_wrapfunctions_cpp()
         self._write_wrapfunctions_header()
         self._write_model_header_cpp()
@@ -331,13 +322,30 @@ class DEExporter:
 
         return {symbol.name: index for index, symbol in enumerate(symbols)}
 
-    def _write_index_files(self, name: str) -> None:
+    def _get_local_declarations(
+        self, name: str, is_used: Callable[[str], bool] | None = None
+    ) -> list[str]:
         """
-        Write index file for a symbolic array.
+        Declare a local alias for every entry of symbolic array ``name``
+        that the current function's generated code actually references.
 
         :param name:
-            key in ``self.model._syms`` for which the respective file should
-            be written
+            key in ``self.model._syms`` for which declarations should be
+            generated
+        :param is_used:
+            called with a candidate entry's mangled name; entries for which
+            this returns ``False`` are skipped. If ``None``, a declaration
+            is generated for every (non-zero) entry. Usage is checked
+            against the printed code rather than the symbolic equations,
+            since some entries (e.g. spline (sensitivity) values) are only
+            ever referenced via a custom print function, never appearing
+            as a plain symbol in the equations themselves.
+
+            TODO: once splines no longer need a custom print function for
+            this (i.e. spline (sensitivity) values are represented as
+            regular symbols in the equations), this can go back to a plain
+            ``equations.free_symbols`` set instead of matching against
+            printed text.
         """
         if name not in self.model.sym_names():
             raise ValueError(f"Unknown symbolic array: {name}")
@@ -348,7 +356,7 @@ class DEExporter:
             else self.model.sym(name).T
         )
         if not len(symbols):
-            return
+            return []
 
         # flatten multiobs
         if isinstance(next(iter(symbols), None), list):
@@ -358,18 +366,17 @@ class DEExporter:
         for index, symbol in enumerate(symbols):
             if symbol.is_zero:
                 continue
-            symbol_name = symbol.name
-            if str(symbol_name) == "":
+            if str(symbol.name) == "":
                 raise ValueError(f'{name} contains a symbol called ""')
-            lines.append(f"#define {symbol_name} {name}[{index}]")
+            mangled = self._code_printer.mangle_identifier(symbol.name)
+            if is_used is not None and not is_used(mangled):
+                continue
+            lines.append(f"    const realtype {mangled} = {name}[{index}];")
             if name == "stau":
-                # we only need a single macro, as all entries have the same symbol
+                # all entries share the same symbol; only declare it once
                 break
 
-        filename = os.path.join(self.model_path, f"{name}.h")
-        with open(filename, "w") as fileout:
-            fileout.write("\n".join(lines))
-            fileout.write("\n")
+        return lines
 
     def _write_function_file(self, function: str) -> None:
         """
@@ -406,6 +413,18 @@ class DEExporter:
         if not body:
             return
 
+        # whether a dependency's mangled name is referenced by the printed
+        # body, to skip declaring unused aliases below. Checked against the
+        # printed code rather than the symbolic equations -- see
+        # `_get_local_declarations`
+        body_text = "\n".join(body)
+
+        def is_used(mangled_name: str) -> bool:
+            return (
+                re.search(rf"\b{re.escape(mangled_name)}\b", body_text)
+                is not None
+            )
+
         # colptrs / rowvals for sparse matrices
         if function in sparse_functions:
             lines = self._generate_function_index(function, "colptrs")
@@ -419,10 +438,11 @@ class DEExporter:
         # function header
         lines.extend(func_info.header)
 
-        # extract symbols that need definitions from signature
-        # don't add includes for files that won't be generated.
-        # Unfortunately we cannot check for `self.functions[sym].body`
-        # here since it may not have been generated yet.
+        # local declarations aliasing every array this function reads from.
+        # Skip arrays that won't be generated. Unfortunately we cannot check
+        # for `self.functions[sym].body` here since it may not have been
+        # generated yet.
+        local_decls = []
         for sym in func_info.get_deps(ode=self.model.is_ode()):
             if sym not in self.model.sym_names():
                 continue
@@ -451,14 +471,7 @@ class DEExporter:
             ):
                 continue
 
-            lines.append(f'#include "{sym}.h"')
-
-        # include return symbols
-        if (
-            function in self.model.sym_names()
-            and function not in non_unique_id_symbols
-        ):
-            lines.append(f'#include "{function}.h"')
+            local_decls.extend(self._get_local_declarations(sym, is_used))
 
         lines.extend(
             [
@@ -470,6 +483,9 @@ class DEExporter:
                 f"({func_info.arguments(self.model.is_ode())}){{",
             ]
         )
+        lines += local_decls
+        if local_decls:
+            lines.append("")
 
         if self.assume_pow_positivity and func_info.assume_pow_positivity:
             pow_rx = re.compile(r"(^|\W)std::pow\(")
@@ -776,17 +792,18 @@ class DEExporter:
             )
 
             if function in ("w", "dwdw", "dwdx", "dwdp"):
+                # References to every output are declared once, up front,
+                # covering both the static and dynamic subsets below.
+                lines += self._code_printer._get_output_declarations(
+                    symbols, function, 4
+                )
+
                 # Split into a block of static and dynamic expressions.
-                if len(static_idxs := self.model.static_indices(function)) > 0:
-                    tmp_symbols = sp.Matrix(
-                        [[symbols[i]] for i in static_idxs]
-                    )
-                    tmp_equations = sp.Matrix(
-                        [equations[i] for i in static_idxs]
-                    )
+                static_idxs = self.model.static_indices(function)
+                if len(static_idxs) > 0:
                     tmp_lines = self._code_printer._get_sym_lines_symbols(
-                        tmp_symbols,
-                        tmp_equations,
+                        sp.Matrix([[symbols[i]] for i in static_idxs]),
+                        sp.Matrix([equations[i] for i in static_idxs]),
                         function,
                         8,
                         static_idxs,
@@ -802,17 +819,11 @@ class DEExporter:
                         )
 
                 # dynamic expressions
-                if len(dynamic_idxs := self.model.dynamic_indices(function)):
-                    tmp_symbols = sp.Matrix(
-                        [[symbols[i]] for i in dynamic_idxs]
-                    )
-                    tmp_equations = sp.Matrix(
-                        [equations[i] for i in dynamic_idxs]
-                    )
-
+                dynamic_idxs = self.model.dynamic_indices(function)
+                if len(dynamic_idxs):
                     tmp_lines = self._code_printer._get_sym_lines_symbols(
-                        tmp_symbols,
-                        tmp_equations,
+                        sp.Matrix([[symbols[i]] for i in dynamic_idxs]),
+                        sp.Matrix([equations[i] for i in dynamic_idxs]),
                         function,
                         4,
                         dynamic_idxs,
@@ -822,6 +833,9 @@ class DEExporter:
                         lines.extend(tmp_lines)
 
             else:
+                lines += self._code_printer._get_output_declarations(
+                    symbols, function, 4
+                )
                 lines += self._code_printer._get_sym_lines_symbols(
                     symbols, equations, function, 4
                 )
@@ -1246,8 +1260,11 @@ class DEExporter:
         else:
             syms = self.model.sym(name)
 
+        original_ids = self.model.reserved_symbol_original_ids
         return "\n".join(
-            f'"{self._code_printer.doprint(symbol)}", // {name}[{idx}]'
+            # NOT self._code_printer.doprint(symbol): that mangles for C++
+            # use; public ids must stay exactly as the user named them.
+            f'"{original_ids.get(symbol.name, symbol.name)}", // {name}[{idx}]'
             for idx, symbol in enumerate(syms)
         )
 

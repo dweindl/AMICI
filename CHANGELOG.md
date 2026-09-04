@@ -4,6 +4,24 @@ See also our [versioning policy](https://amici.readthedocs.io/en/latest/versioni
 
 ## v1.X Series
 
+### v1.1.1 (unreleased)
+
+**Fixes**
+
+* Fixed model import/compilation failing, or generating incorrect code
+  without any indication of the actual cause, when a model entity's ID
+  collided with a C++ keyword, a standard-library macro (e.g. `NULL`,
+  `EOF`), or one of AMICI's reserved argument names (`x`, `p`, `k`, `h`,
+  `w`, `y`). Generated C++ files no longer rely on unscoped `#define`
+  macros for entity names.
+
+  As a side effect, the local variable names used internally in generated
+  model code have changed (e.g. `STAT` is now printed as `STAT_`). This
+  does not affect the public API — state/parameter/observable IDs are
+  unaffected — but if you inspect or post-process AMICI-generated C++
+  source directly, expect different local variable names (#2226, #2461,
+  #3237).
+
 ### v1.1 (2026-09-03)
 
 **BREAKING CHANGES**

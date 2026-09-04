@@ -56,12 +56,12 @@ def test_min_max():
     """Check that AmiciCxxCodePrinter prints min() and max() correctly."""
     a, b, c = sp.symbols("a b c")
     cp = AmiciCxxCodePrinter()
-    assert cp.doprint(sp.Min(a)) == "a"
-    assert cp.doprint(sp.Max(a)) == "a"
-    assert cp.doprint(sp.Min(a, b)) == "std::min(a, b)"
-    assert cp.doprint(sp.Max(a, b)) == "std::max(a, b)"
-    assert cp.doprint(sp.Min(a, b, c)) == "std::min({a, b, c})"
-    assert cp.doprint(sp.Max(a, b, c)) == "std::max({a, b, c})"
+    assert cp.doprint(sp.Min(a)) == "a_"
+    assert cp.doprint(sp.Max(a)) == "a_"
+    assert cp.doprint(sp.Min(a, b)) == "std::min(a_, b_)"
+    assert cp.doprint(sp.Max(a, b)) == "std::max(a_, b_)"
+    assert cp.doprint(sp.Min(a, b, c)) == "std::min({a_, b_, c_})"
+    assert cp.doprint(sp.Max(a, b, c)) == "std::max({a_, b_, c_})"
 
 
 @skip_on_valgrind
@@ -72,6 +72,53 @@ def test_float_arithmetic():
     cp = AmiciCxxCodePrinter()
     assert cp.doprint(sp.Rational(1, 2)) == "1.0/2.0"
     assert cp.doprint(sp.Integer(1) / sp.Integer(2)) == "1.0/2.0"
+
+
+@skip_on_valgrind
+def test_mangle_identifier():
+    """Check identifier mangling for reserved/keyword-colliding names."""
+    cp = AmiciCxxCodePrinter()
+
+    # ordinary names just get a trailing underscore
+    assert cp.mangle_identifier("STAT") == "STAT_"
+
+    # names already ending in `_` get a bare-letter marker, not `_v` --
+    # regression test: `f"{name}_v"` would produce "k__v", reintroducing
+    # exactly the `__` this is supposed to avoid
+    assert cp.mangle_identifier("k_") == "k_v"
+    assert "__" not in cp.mangle_identifier("k_")
+    assert "__" not in cp.mangle_identifier("k__")
+
+    # an internal `__` run collapses to a single `_` before suffixing
+    assert cp.mangle_identifier("my__species") == "my_species_"
+
+    # C++ keywords and stdlib macros mangle to something distinct from the
+    # original token
+    for name in (
+        "int",
+        "class",
+        "template",
+        "new",
+        "for",
+        "NULL",
+        "EOF",
+        "INFINITY",
+        "NAN",
+    ):
+        mangled = cp.mangle_identifier(name)
+        assert mangled != name
+        assert "__" not in mangled
+
+    # same input -> same output (cache hit, not recomputed)
+    assert cp.mangle_identifier("STAT") == cp.mangle_identifier("STAT")
+
+    # distinct inputs that collapse to the same base still get distinct,
+    # `__`-free results
+    r1 = cp.mangle_identifier("a__b")
+    r2 = cp.mangle_identifier("a_b")
+    assert r1 != r2
+    assert "__" not in r1
+    assert "__" not in r2
 
 
 @skip_on_valgrind
@@ -86,20 +133,29 @@ def test_extract_cse():
     syms = sp.Matrix([x1, x2, x3])
     eqs = sp.Matrix([a * b * c, a * b, a * b * c + a])
 
+    # every output gets a reference bound to its array slot, declared
+    # once, so the assignment itself can use the readable name as its LHS
+    expected_decl = [
+        "  realtype &x1_ = x[0];",
+        "  realtype &x2_ = x[1];",
+        "  realtype &x3_ = x[2];",
+    ]
     expected = [
-        "  x1 = a*b*c;  // x[0]",
-        "  x2 = a*b;  // x[1]",
-        "  x3 = a*b*c + a;  // x[2]",
+        "  x1_ = a_*b_*c_;  // x[0]",
+        "  x2_ = a_*b_;  // x[1]",
+        "  x3_ = a_*b_*c_ + a_;  // x[2]",
     ]
-
     expected_cse = [
-        "  const realtype __amici_cse_0 = a*b;",
-        "  const realtype __amici_cse_1 = __amici_cse_0*c;",
-        "  x2 = __amici_cse_0;  // x[1]",
-        "  x1 = __amici_cse_1;  // x[0]",
-        "  x3 = __amici_cse_1 + a;  // x[2]",
+        "  const realtype amici_cse_0_ = a_*b_;",
+        "  const realtype amici_cse_1_ = amici_cse_0_*c_;",
+        "  x2_ = amici_cse_0_;  // x[1]",
+        "  x1_ = amici_cse_1_;  // x[0]",
+        "  x3_ = a_ + amici_cse_1_;  // x[2]",
     ]
 
+    assert expected_decl == cp._get_output_declarations(
+        symbols=syms, variable="x", indent_level=2
+    )
     assert expected == cp._get_sym_lines_symbols(
         symbols=syms, equations=eqs, variable="x", indent_level=2
     )
@@ -107,14 +163,21 @@ def test_extract_cse():
         symbols=syms, equations=eqs, variable="x", indent_level=2
     )
 
-    expected = ["  x[0] = a*b*c;", "  x[1] = a*b;", "  x[2] = a*b*c + a;"]
+    expected = [
+        "  x[0] = a_*b_*c_;",
+        "  x[1] = a_*b_;",
+        "  x[2] = a_*b_*c_ + a_;",
+    ]
     expected_cse = [
         "  {",
-        "    const realtype __amici_cse_0 = a*b;",
-        "    const realtype __amici_cse_1 = __amici_cse_0*c;",
-        "    x[1] = __amici_cse_0;  // x[1]",
-        "    x[0] = __amici_cse_1;  // x[0]",
-        "    x[2] = __amici_cse_1 + a;  // x[2]",
+        "    realtype &x0_ = x[0];",
+        "    realtype &x1_ = x[1];",
+        "    realtype &x2_ = x[2];",
+        "    const realtype amici_cse_0_ = a_*b_;",
+        "    const realtype amici_cse_1_ = amici_cse_0_*c_;",
+        "    x1_ = amici_cse_0_;  // x[1]",
+        "    x0_ = amici_cse_1_;  // x[0]",
+        "    x2_ = a_ + amici_cse_1_;  // x[2]",
         "  }",
     ]
     assert expected == cp._get_sym_lines_array(
@@ -122,4 +185,34 @@ def test_extract_cse():
     )
     assert expected_cse == cp_cse._get_sym_lines_array(
         equations=eqs, variable="x", indent_level=2
+    )
+
+
+@skip_on_valgrind
+def test_sym_lines_symbols_output_reference_reused():
+    """A later equation can read an earlier output through its declared
+    reference (e.g. `w`'s dynamic expressions depending on an earlier `w`
+    entry) -- and, since the reference doesn't depend on any computed
+    value, this works even across control-flow boundaries the equations
+    themselves don't share (see the `include_static`/dynamic split in
+    `DEExporter._get_function_body`)."""
+    cp = AmiciCxxCodePrinter()
+    a, b = sp.symbols("a b")
+    y1, y2 = sp.symbols("y1 y2")
+    syms = sp.Matrix([y1, y2])
+    eqs = sp.Matrix([a * b, y1 + 1])  # y2's equation references y1
+
+    expected_decl = [
+        "  realtype &y1_ = x[0];",
+        "  realtype &y2_ = x[1];",
+    ]
+    expected = [
+        "  y1_ = a_*b_;  // x[0]",
+        "  y2_ = y1_ + 1;  // x[1]",
+    ]
+    assert expected_decl == cp._get_output_declarations(
+        symbols=syms, variable="x", indent_level=2
+    )
+    assert expected == cp._get_sym_lines_symbols(
+        symbols=syms, equations=eqs, variable="x", indent_level=2
     )

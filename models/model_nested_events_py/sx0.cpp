@@ -2,8 +2,6 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "p.h"
 
 namespace amici {
 namespace model_model_nested_events_py {

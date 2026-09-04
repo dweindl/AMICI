@@ -5,8 +5,6 @@ import pytest
 
 pysb = pytest.importorskip("pysb")
 
-from contextlib import suppress
-
 from amici import import_model_module
 from amici.importers.bngl import bngl2amici
 from amici.sim.sundials import run_simulation
@@ -43,12 +41,7 @@ tests = [
 @skip_on_valgrind
 @pytest.mark.parametrize("example", tests)
 def test_compare_to_pysb_simulation(example):
-    from amici.importers.utils import RESERVED_SYMBOLS, MeasurementChannel
-
-    # allow "NULL" as model symbol
-    # (used in CaOscillate_Func and Repressilator examples)
-    with suppress(ValueError):
-        RESERVED_SYMBOLS.remove("NULL")
+    from amici.importers.utils import MeasurementChannel
 
     atol = 1e-12
     rtol = 1e-10
@@ -95,11 +88,15 @@ def test_compare_to_pysb_simulation(example):
                 )
 
         if example in ["empty_compartments_block", "motor"]:
+            # these define a model quantity literally named "k"/"w" --
+            # reserved AMICI array-parameter names. Unlike SBML import,
+            # PySB/BNGL import has no automatic rename-and-restore for
+            # reserved names, so this is expected to fail outright.
             with pytest.raises(ValueError, match="Cannot add"):
                 bngl2amici(model_file, output_dir=outdir, **kwargs)
             return
-        else:
-            bngl2amici(model_file, output_dir=outdir, **kwargs)
+
+        bngl2amici(model_file, output_dir=outdir, **kwargs)
 
         amici_model_module = import_model_module(pysb_model.name, outdir)
 

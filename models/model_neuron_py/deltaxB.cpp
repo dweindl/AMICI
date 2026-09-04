@@ -2,22 +2,24 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "p.h"
-#include "k.h"
-#include "h.h"
-#include "xdot.h"
-#include "xdot_old.h"
-#include "x_old.h"
-#include "xB.h"
 
 namespace amici {
 namespace model_model_neuron_py {
 
 void deltaxB_model_neuron_py(realtype *deltaxB, const realtype t, const realtype *x, const realtype *p, const realtype *k, const realtype *h, const realtype *w, const realtype *dx, const int ie, const realtype *xdot, const realtype *xdot_old, const realtype *x_old, const realtype *xB, const realtype *tcl){
+    const realtype v_ = x[0];
+    const realtype u_ = x[1];
+    const realtype I0_ = k[1];
+    const realtype dvdt_ = xdot[0];
+    const realtype dudt_ = xdot[1];
+    const realtype xdot_old0_ = xdot_old[0];
+    const realtype xdot_old1_ = xdot_old[1];
+    const realtype xB0_ = xB[0];
+    const realtype xB1_ = xB[1];
+
     switch(ie) {
         case 0:
-            deltaxB[0] = xB0*(xdot_old0/(I0 - u + (1.0/25.0)*std::pow(v, 2) + 5*v + 140) + (dvdt - xdot_old0)/(I0 - u + (1.0/25.0)*std::pow(v, 2) + 5*v + 140) - 1) + xB1*(dudt - xdot_old1)/(I0 - u + (1.0/25.0)*std::pow(v, 2) + 5*v + 140);
+            deltaxB[0] = xB0_*(xdot_old0_/(I0_ - u_ + (1.0/25.0)*std::pow(v_, 2) + 5*v_ + 140) + (dvdt_ - xdot_old0_)/(I0_ - u_ + (1.0/25.0)*std::pow(v_, 2) + 5*v_ + 140) - 1) + xB1_*(dudt_ - xdot_old1_)/(I0_ - u_ + (1.0/25.0)*std::pow(v_, 2) + 5*v_ + 140);
             break;
     }
 }

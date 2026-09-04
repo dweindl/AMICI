@@ -413,6 +413,9 @@ def test_pysb_event(tempdir):
     model = pysb.Model("pysb_event_test")
     a = pysb.Monomer("A")
     pysb.Initial(a(), pysb.Parameter("a0"))
+    # "k" is reserved (it's one of AMICI's fixed array-parameter names);
+    # unlike SBML import, PySB import has no automatic rename-and-restore
+    # for reserved names, so it must be avoided here
     pysb.Rule("deg", a() >> None, pysb.Parameter("kk", 1.0))
 
     events = [

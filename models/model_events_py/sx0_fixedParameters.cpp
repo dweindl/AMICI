@@ -3,8 +3,6 @@
 
 #include <algorithm>
 #include <gsl/gsl-lite.hpp>
-#include "p.h"
-#include "k.h"
 
 namespace amici {
 namespace model_model_events_py {

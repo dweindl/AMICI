@@ -12,7 +12,21 @@ from sympy.printing.cxx import CXX11CodePrinter
 from sympy.utilities.iterables import numbered_symbols
 from toposort import toposort
 
-from amici.importers.utils import symbol_with_assumptions
+from amici.importers.utils import amici_time_symbol, symbol_with_assumptions
+
+
+def _mangle(name: str) -> str:
+    """Make a model-derived identifier safe as a C++ local variable name.
+
+    Appends `_` so it can never equal a real keyword/macro. Collapses any
+    SBML-legal `__` run first, and uses `v` instead of `_` as the marker for
+    names already ending in `_`, so the result never contains `__` either.
+    This is not injective and does not guarantee a unique result on its own
+    (e.g. `"a__b"` and `"a_b"` both collapse to the same string) -- callers
+    that need uniqueness across a whole model handle that separately.
+    """
+    name = re.sub(r"_{2,}", "_", name)
+    return f"{name}v" if name.endswith("_") else f"{name}_"
 
 
 class AmiciCxxCodePrinter(CXX11CodePrinter):
@@ -55,6 +69,33 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
             self._fpoptimizer = lambda x: optimize(x, self.optimizations)
         else:
             self._fpoptimizer = None
+
+        # mangled-name cache, keyed by original identifier, for this model
+        self._mangled_names: dict[str, str] = {}
+        # mangled names already assigned, for collision detection
+        self._mangled_name_set: set[str] = set()
+
+    def mangle_identifier(self, name: str) -> str:
+        """Mangle `name`, deduplicating against prior results for this model.
+
+        Same input always yields the same output; distinct inputs never
+        yield the same output.
+        """
+        if (cached := self._mangled_names.get(name)) is not None:
+            return cached
+        base = mangled = _mangle(name)
+        n = 2
+        while mangled in self._mangled_name_set:
+            mangled = f"{base}{n}"
+            n += 1
+        self._mangled_names[name] = mangled
+        self._mangled_name_set.add(mangled)
+        return mangled
+
+    def _print_Symbol(self, expr: sp.Symbol) -> str:
+        if expr == amici_time_symbol:
+            return "t"
+        return self.mangle_identifier(expr.name)
 
     def doprint(self, expr: sp.Expr, assign_to: str | None = None) -> str:
         if self._fpoptimizer:
@@ -147,10 +188,19 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
             indices = range(len(equations))
 
         if self.extract_cse:
-            res = self._get_sym_lines_symbols(
-                symbols=sp.Matrix(
-                    [sp.Symbol(f"{variable}[{index}]") for index in indices]
-                ),
+            # placeholder names only, never seen by users -- must still be
+            # valid identifiers since they go through the usual declare-and-
+            # store printing, so no `[`/`]` as in the actual array access
+            placeholder_symbols = sp.Matrix(
+                [sp.Symbol(f"{variable}{index}") for index in indices]
+            )
+            res = self._get_output_declarations(
+                symbols=placeholder_symbols,
+                variable=variable,
+                indent_level=indent_level,
+                indices=indices,
+            ) + self._get_sym_lines_symbols(
+                symbols=placeholder_symbols,
                 equations=equations,
                 variable=variable,
                 indent_level=indent_level,
@@ -171,6 +221,43 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
             if math not in [0, 0.0]
         ]
 
+    def _get_output_declarations(
+        self,
+        symbols: sp.Matrix,
+        variable: str,
+        indent_level: int,
+        indices: Sequence[int] | None = None,
+    ) -> list[str]:
+        """
+        Declare a named, non-`const` reference bound to each entry of
+        `variable`, for `_get_sym_lines_symbols` to assign through.
+
+        :param symbols:
+            vectors of symbols that equations are assigned to
+
+        :param variable:
+            name of the C++ array to assign to
+
+        :param indent_level:
+            indentation level (number of leading blanks)
+
+        :param indices:
+            Optional custom indices corresponding to entries in `symbols`.
+
+        :return:
+            C++ code as list of lines
+        """
+        if indices is None:
+            indices = range(len(symbols))
+        else:
+            assert len(indices) == len(symbols)
+
+        indent = " " * indent_level
+        return [
+            f"{indent}realtype &{self.doprint(sym)} = {variable}[{index}];"
+            for index, sym in zip(indices, symbols, strict=True)
+        ]
+
     def _get_sym_lines_symbols(
         self,
         symbols: sp.Matrix,
@@ -180,8 +267,9 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
         indices: Sequence[int] | None = None,
     ) -> list[str]:
         """
-        Generate C++ code for where array elements are directly replaced with
-        their corresponding macro symbol
+        Generate C++ code assigning each entry's expression through the
+        reference declared for it by `_get_output_declarations` (which
+        must be called first, with the same arguments).
 
         :param symbols:
             vectors of symbols that equations are assigned to
@@ -190,14 +278,13 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
             vectors of expressions
 
         :param variable:
-            name of the C++ array to assign to, only used in comments
+            name of the C++ array to assign to
 
         :param indent_level:
             indentation level (number of leading blanks)
 
         :param indices:
             Optional custom indices corresponding to entries in `symbols`.
-            Only used for comments.
 
         :return:
             C++ code as list of lines
@@ -210,15 +297,9 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
 
         indent = " " * indent_level
 
-        def format_regular_line(symbol, math, index):
-            return (
-                f"{indent}{self.doprint(symbol)} = {self.doprint(math)};"
-                f"  // {variable}[{index}]".replace("\n", "\n" + indent)
-            )
-
         if self.extract_cse:
             # Extract common subexpressions
-            cse_sym_prefix = "__amici_cse_"
+            cse_sym_prefix = "amici_cse_"
             symbol_generator = numbered_symbols(
                 cls=sp.Symbol, prefix=cse_sym_prefix
             )
@@ -250,18 +331,22 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
                     sym: idx for idx, sym in zip(indices, symbols, strict=True)
                 }
 
-                def format_line(symbol: sp.Symbol):
+                def format_line(symbol: sp.Symbol) -> str | None:
                     math = expr_dict[symbol]
                     if str(symbol).startswith(cse_sym_prefix):
                         return (
                             f"{indent}const realtype "
-                            f"{self.doprint(symbol)} "
-                            f"= {self.doprint(math)};"
+                            f"{self.doprint(symbol)} = "
+                            f"{self.doprint(math)};"
                         )
-                    elif math not in [0, 0.0]:
-                        return format_regular_line(
-                            symbol, math, symbol_to_idx[symbol]
-                        )
+                    if math in [0, 0.0]:
+                        return None
+                    math_str = self.doprint(math).replace("\n", "\n" + indent)
+                    idx = symbol_to_idx[symbol]
+                    return (
+                        f"{indent}{self.doprint(symbol)} = {math_str};"
+                        f"  // {variable}[{idx}]"
+                    )
 
                 return [
                     line
@@ -270,13 +355,16 @@ class AmiciCxxCodePrinter(CXX11CodePrinter):
                     if (line := format_line(symbol))
                 ]
 
-        return [
-            format_regular_line(sym, math, index)
-            for index, sym, math in zip(
-                indices, symbols, equations, strict=True
+        lines = []
+        for index, sym, math in zip(indices, symbols, equations, strict=True):
+            if math in [0, 0.0]:
+                continue
+            math_str = self.doprint(math).replace("\n", "\n" + indent)
+            lines.append(
+                f"{indent}{self.doprint(sym)} = {math_str};"
+                f"  // {variable}[{index}]"
             )
-            if math not in [0, 0.0]
-        ]
+        return lines
 
     @staticmethod
     def print_bool(expr) -> str:

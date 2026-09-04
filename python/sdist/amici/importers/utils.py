@@ -20,17 +20,31 @@ __all__ = [
     "MeasurementChannel",
 ]
 
-# Symbols reserved by AMICI. Model entities with these IDs will be renamed.
+# Symbols reserved by AMICI: model entities with these IDs will be renamed.
+#
+# `t` is merged into the model's expression graph as an actual sympy.Symbol
+# (amici.importers.sbml._process_time), so it must never collide with a
+# model entity.
+#
+# `x`, `p`, `k`, `h`, `w`, `y` are the fixed array-parameter names AMICI
+# functions are generated with, for both backends. The C++ printer mangles
+# every identifier it prints (AmiciCxxCodePrinter.mangle_identifier), so
+# a model entity sharing one of these names is safe there -- but the JAX
+# exporter has no such protection: its generated methods destructure the
+# array parameter into per-entry locals *by reusing the parameter's own
+# name* (e.g. `def _xdot(self, t, x, args): x, = x`), so an entity actually
+# named e.g. "x" silently shadows the array parameter for the rest of that
+# function, corrupting any later use of the array itself (e.g. a call like
+# `self._w(t, x, ...)` then passes the already-unpacked scalar instead of
+# the array). Renaming here avoids that regardless of target backend.
 RESERVED_SYMBOLS = [
-    "x",
-    "k",
-    "p",
-    "y",
-    "w",
-    "h",
     "t",
-    "AMICI_EMPTY_BOLUS",
-    "NULL",
+    "x",
+    "p",
+    "k",
+    "h",
+    "w",
+    "y",
 ]
 
 

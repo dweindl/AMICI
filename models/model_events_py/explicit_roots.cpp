@@ -3,16 +3,16 @@
 
 #include <algorithm>
 #include <vector>
-#include "p.h"
-#include "k.h"
 
 namespace amici {
 namespace model_model_events_py {
 
 std::vector<std::vector<realtype>> explicit_roots_model_events_py(const realtype *p, const realtype *k, const realtype *w){
+    const realtype p4_ = p[3];
+
     return {
-        {p4},
-        {p4},
+        {p4_},
+        {p4_},
         {4},
         {4}
     };

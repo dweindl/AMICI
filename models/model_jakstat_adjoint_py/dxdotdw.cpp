@@ -45,18 +45,18 @@ void dxdotdw_rowvals_model_jakstat_adjoint_py(SUNMatrixWrapper &dxdotdw){
 #include <algorithm>
 #include <sundials/sundials_types.h>
 #include <gsl/gsl-lite.hpp>
-#include "x.h"
-#include "p.h"
-#include "k.h"
-#include "w.h"
-#include "dxdotdw.h"
 
 namespace amici {
 namespace model_model_jakstat_adjoint_py {
 
 void dxdotdw_model_jakstat_adjoint_py(realtype *dxdotdw, const realtype t, const realtype *x, const realtype *p, const realtype *k, const realtype *h, const realtype *w){
-    ddSTATdt_du = -STAT*p1;  // dxdotdw[0]
-    ddpSTATdt_du = STAT*p1;  // dxdotdw[1]
+    const realtype STAT_ = x[0];
+    const realtype p1_ = p[0];
+
+    realtype &ddSTATdt_du_ = dxdotdw[0];
+    realtype &ddpSTATdt_du_ = dxdotdw[1];
+    ddSTATdt_du_ = -STAT_*p1_;  // dxdotdw[0]
+    ddpSTATdt_du_ = STAT_*p1_;  // dxdotdw[1]
 }
 
 } // namespace model_model_jakstat_adjoint_py

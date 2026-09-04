@@ -2,19 +2,20 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "p.h"
-#include "k.h"
-#include "h.h"
 
 namespace amici {
 namespace model_model_events_py {
 
 void root_model_events_py(realtype *root, const realtype t, const realtype *x, const realtype *p, const realtype *k, const realtype *h, const realtype *w, const realtype *tcl){
-    root[0] = x2 - x3;
-    root[1] = x1 - x3;
-    root[2] = p4 - t;
-    root[3] = -p4 + t;
+    const realtype x1_ = x[0];
+    const realtype x2_ = x[1];
+    const realtype x3_ = x[2];
+    const realtype p4_ = p[3];
+
+    root[0] = x2_ - x3_;
+    root[1] = x1_ - x3_;
+    root[2] = p4_ - t;
+    root[3] = -p4_ + t;
     root[4] = 4 - t;
     root[5] = t - 4;
 }

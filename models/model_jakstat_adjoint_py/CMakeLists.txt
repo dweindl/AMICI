@@ -66,47 +66,29 @@ endif()
 set(MODEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(SRC_LIST_LIB Jy.cpp 
-Jy.h 
 create_splines.cpp 
 dJydsigma.cpp 
 dJydy.cpp 
-dJydy.h 
 dsigmaydp.cpp 
 dspline_valuesdp.cpp 
 dwdp.cpp 
-dwdp.h 
 dxdotdp_explicit.cpp 
-dxdotdp_explicit.h 
 dxdotdw.cpp 
-dxdotdw.h 
 dxdotdx_explicit.cpp 
-dxdotdx_explicit.h 
 dydp.cpp 
 dydx.cpp 
-k.h 
 model_jakstat_adjoint_py.cpp 
 model_jakstat_adjoint_py.h 
-my.h 
-p.h 
 sigmay.cpp 
-sigmay.h 
-spl.h 
-sspl.h 
 sx0.cpp 
 w.cpp 
-w.h 
 wrapfunctions.cpp 
 wrapfunctions.h 
-x.h 
 x0.cpp 
 x_rdata.cpp 
-x_rdata.h 
 x_solver.cpp 
-x_solver.h 
 xdot.cpp 
-xdot.h 
-y.cpp 
-y.h  ${MODEL_DIR}/wrapfunctions.cpp)
+y.cpp  ${MODEL_DIR}/wrapfunctions.cpp)
 
 add_library(${PROJECT_NAME} ${SRC_LIST_LIB})
 

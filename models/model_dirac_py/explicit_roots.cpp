@@ -3,14 +3,15 @@
 
 #include <algorithm>
 #include <vector>
-#include "p.h"
 
 namespace amici {
 namespace model_model_dirac_py {
 
 std::vector<std::vector<realtype>> explicit_roots_model_dirac_py(const realtype *p, const realtype *k, const realtype *w){
+    const realtype p2_ = p[1];
+
     return {
-        {p2}
+        {p2_}
     };
 }
 

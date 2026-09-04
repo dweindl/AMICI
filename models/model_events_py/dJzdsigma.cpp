@@ -2,22 +2,24 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "p.h"
-#include "k.h"
-#include "z.h"
-#include "sigmaz.h"
-#include "mz.h"
 
 namespace amici {
 namespace model_model_events_py {
 
 void dJzdsigma_model_events_py(realtype *dJzdsigma, const int iz, const realtype *p, const realtype *k, const realtype *z, const realtype *sigmaz, const realtype *mz){
+    const realtype z1_ = z[0];
+    const realtype z2_ = z[1];
+    const realtype sigma_z1_ = sigmaz[0];
+    const realtype sigma_z2_ = sigmaz[1];
+    const realtype mz1_ = mz[0];
+    const realtype mz2_ = mz[1];
+
     switch(iz) {
         case 0:
-            dJzdsigma[0] = 1.0/sigma_z1 - 1.0*std::pow(-mz1 + z1, 2)/std::pow(sigma_z1, 3);
+            dJzdsigma[0] = 1.0/sigma_z1_ - 1.0*std::pow(-mz1_ + z1_, 2)/std::pow(sigma_z1_, 3);
             break;
         case 1:
-            dJzdsigma[1] = 1.0/sigma_z2 - 1.0*std::pow(-mz2 + z2, 2)/std::pow(sigma_z2, 3);
+            dJzdsigma[1] = 1.0/sigma_z2_ - 1.0*std::pow(-mz2_ + z2_, 2)/std::pow(sigma_z2_, 3);
             break;
     }
 }

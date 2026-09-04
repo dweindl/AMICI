@@ -2,13 +2,14 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "p.h"
 
 namespace amici {
 namespace model_model_nested_events_py {
 
 void x0_model_nested_events_py(realtype *x0, const realtype t, const realtype *p, const realtype *k){
-    x0[0] = V_0;
+    const realtype V_0_ = p[0];
+
+    x0[0] = V_0_;
 }
 
 } // namespace model_model_nested_events_py

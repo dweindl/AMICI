@@ -240,6 +240,11 @@ class DEModel:
         self._conservation_laws: list[ConservationLaw] = []
         self._events: list[Event] = []
         self._splines: list[AbstractSpline] = []
+        # internal symbol name -> original user-facing id, for symbols an
+        # importer had to rename to avoid colliding with an amici-internal
+        # symbol; consulted wherever an id is reported outward so the
+        # rename stays invisible to users
+        self.reserved_symbol_original_ids: dict[str, str] = {}
         self._symboldim_funs: dict[str, Callable[[], int]] = {
             "sx": self.num_states_solver,
             "v": self.num_states_solver,

@@ -302,9 +302,9 @@ def test_flatten_timepoint_specific_output_overrides_special_cases():
 def test_petab_simulator_deepcopy_and_pickle():
     """Test that PetabImporter can be deep-copied"""
     problem = Problem()
-    problem.model = SbmlModel.from_antimony("xx = 1; xx' = kk;")
-    problem.add_parameter("kk", nominal_value=1.0, estimate=True, lb=0, ub=10)
-    problem.add_observable("obs1", "xx", noise_formula="1")
+    problem.model = SbmlModel.from_antimony("x = 1; x' = k;")
+    problem.add_parameter("k", nominal_value=1.0, estimate=True, lb=0, ub=10)
+    problem.add_observable("obs1", "x", noise_formula="1")
     for i in range(5):
         problem.add_measurement("obs1", time=i, measurement=2 * i)
 
@@ -314,7 +314,7 @@ def test_petab_simulator_deepcopy_and_pickle():
 
     ps_copy = copy.deepcopy(ps)
 
-    assert ps.simulate({"kk": 2}).llh == ps_copy.simulate({"kk": 2}).llh
+    assert ps.simulate({"k": 2}).llh == ps_copy.simulate({"k": 2}).llh
 
     ps.solver.set_sensitivity_order(SensitivityOrder.first)
     assert (
@@ -325,7 +325,7 @@ def test_petab_simulator_deepcopy_and_pickle():
     import pickle
 
     ps_pickle = pickle.loads(pickle.dumps(ps))
-    assert ps.simulate({"kk": 2}).llh == ps_pickle.simulate({"kk": 2}).llh
+    assert ps.simulate({"k": 2}).llh == ps_pickle.simulate({"k": 2}).llh
 
 
 def _residual_test_problem() -> Problem:
