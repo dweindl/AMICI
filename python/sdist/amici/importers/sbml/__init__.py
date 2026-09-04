@@ -1663,6 +1663,17 @@ class SbmlImporter:
                             f"({type(spline.evaluate_at)}) in spline for "
                             f"symbol {sym_id}."
                         )
+                    # `SbmlImporter._replace_in_all_expressions` (called for
+                    # `_process_time`) does not reach into `self._splines`,
+                    # so the sbml-time -> amici-time substitution it applies
+                    # everywhere else in the model must be replicated here,
+                    # or `evaluate_at` stays the SBML time symbol -- a
+                    # distinct object from `amici_time_symbol` despite
+                    # printing the same, silently breaking any
+                    # differentiation with respect to time.
+                    spline._replace_in_all_expressions(
+                        sbml_time_symbol, amici_time_symbol
+                    )
                     self._splines.append(spline)
                     return
 
