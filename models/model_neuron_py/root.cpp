@@ -2,16 +2,14 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "p.h"
-#include "k.h"
-#include "h.h"
 
 namespace amici {
 namespace model_model_neuron_py {
 
 void root_model_neuron_py(realtype *root, const realtype t, const realtype *x, const realtype *p, const realtype *k, const realtype *h, const realtype *w, const realtype *tcl){
-    root[0] = v - 30;
+    const realtype v_ = x[0];
+
+    root[0] = v_ - 30;
 }
 
 } // namespace model_model_neuron_py

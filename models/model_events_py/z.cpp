@@ -2,11 +2,6 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "p.h"
-#include "k.h"
-#include "h.h"
-#include "z.h"
 
 namespace amici {
 namespace model_model_events_py {

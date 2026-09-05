@@ -45,24 +45,25 @@ void dxdotdw_rowvals_model_calvetti_py(SUNMatrixWrapper &dxdotdw){
 #include <algorithm>
 #include <sundials/sundials_types.h>
 #include <gsl/gsl-lite.hpp>
-#include "x.h"
-#include "k.h"
-#include "h.h"
-#include "dx.h"
-#include "w.h"
-#include "dxdotdw.h"
 
 namespace amici {
 namespace model_model_calvetti_py {
 
 void dxdotdw_model_calvetti_py(realtype *dxdotdw, const realtype t, const realtype *x, const realtype *p, const realtype *k, const realtype *h, const realtype *dx, const realtype *w){
-    dae_0_df0 = 1;  // dxdotdw[0]
-    dde_0_drate_of_V1 = 1;  // dxdotdw[1]
-    dae_0_drate_of_V1 = -1;  // dxdotdw[2]
-    dde_1_drate_of_V2 = 1;  // dxdotdw[3]
-    dae_1_drate_of_V2 = -1;  // dxdotdw[4]
-    dde_2_drate_of_V3 = 1;  // dxdotdw[5]
-    dae_2_drate_of_V3 = -1;  // dxdotdw[6]
+    realtype &dae_0_df0_ = dxdotdw[0];
+    realtype &dde_0_drate_of_V1_ = dxdotdw[1];
+    realtype &dae_0_drate_of_V1_ = dxdotdw[2];
+    realtype &dde_1_drate_of_V2_ = dxdotdw[3];
+    realtype &dae_1_drate_of_V2_ = dxdotdw[4];
+    realtype &dde_2_drate_of_V3_ = dxdotdw[5];
+    realtype &dae_2_drate_of_V3_ = dxdotdw[6];
+    dae_0_df0_ = 1;  // dxdotdw[0]
+    dde_0_drate_of_V1_ = 1;  // dxdotdw[1]
+    dae_0_drate_of_V1_ = -1;  // dxdotdw[2]
+    dde_1_drate_of_V2_ = 1;  // dxdotdw[3]
+    dae_1_drate_of_V2_ = -1;  // dxdotdw[4]
+    dde_2_drate_of_V3_ = 1;  // dxdotdw[5]
+    dae_2_drate_of_V3_ = -1;  // dxdotdw[6]
 }
 
 } // namespace model_model_calvetti_py

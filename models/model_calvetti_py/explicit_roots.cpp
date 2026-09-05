@@ -3,8 +3,6 @@
 
 #include <algorithm>
 #include <vector>
-#include "k.h"
-#include "w.h"
 
 namespace amici {
 namespace model_model_calvetti_py {

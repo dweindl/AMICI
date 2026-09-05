@@ -2,10 +2,6 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "p.h"
-#include "h.h"
-#include "sx.h"
 
 namespace amici {
 namespace model_model_dirac_py {

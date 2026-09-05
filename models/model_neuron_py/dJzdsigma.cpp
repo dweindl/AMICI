@@ -2,19 +2,18 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "p.h"
-#include "k.h"
-#include "z.h"
-#include "sigmaz.h"
-#include "mz.h"
 
 namespace amici {
 namespace model_model_neuron_py {
 
 void dJzdsigma_model_neuron_py(realtype *dJzdsigma, const int iz, const realtype *p, const realtype *k, const realtype *z, const realtype *sigmaz, const realtype *mz){
+    const realtype z1_ = z[0];
+    const realtype sigma_z1_ = sigmaz[0];
+    const realtype mz1_ = mz[0];
+
     switch(iz) {
         case 0:
-            dJzdsigma[0] = 1.0/sigma_z1 - 1.0*std::pow(-mz1 + z1, 2)/std::pow(sigma_z1, 3);
+            dJzdsigma[0] = 1.0/sigma_z1_ - 1.0*std::pow(-mz1_ + z1_, 2)/std::pow(sigma_z1_, 3);
             break;
     }
 }

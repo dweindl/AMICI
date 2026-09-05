@@ -2,10 +2,6 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x.h"
-#include "k.h"
-#include "h.h"
-#include "w.h"
 
 namespace amici {
 namespace model_model_calvetti_py {

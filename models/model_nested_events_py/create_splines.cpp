@@ -4,7 +4,6 @@
 #include <algorithm>
 #include "amici/splinefunctions.h"
 #include <vector>
-#include "p.h"
 
 namespace amici {
 namespace model_model_nested_events_py {

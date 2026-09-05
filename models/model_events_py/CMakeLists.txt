@@ -67,14 +67,12 @@ set(MODEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(SRC_LIST_LIB Jrz.cpp 
 Jy.cpp 
-Jy.h 
 Jz.cpp 
 create_splines.cpp 
 dJrzdsigma.cpp 
 dJrzdz.cpp 
 dJydsigma.cpp 
 dJydy.cpp 
-dJydy.h 
 dJzdsigma.cpp 
 dJzdz.cpp 
 deltaqB.cpp 
@@ -82,49 +80,28 @@ deltasx.cpp
 deltaxB.cpp 
 drzdx.cpp 
 dxdotdp_explicit.cpp 
-dxdotdp_explicit.h 
 dxdotdx_explicit.cpp 
-dxdotdx_explicit.h 
 dydp.cpp 
 dydx.cpp 
 dzdx.cpp 
 explicit_roots.cpp 
-h.h 
-k.h 
 model_events_py.cpp 
 model_events_py.h 
-my.h 
-mz.h 
-p.h 
 root.cpp 
 rz.cpp 
-rz.h 
 sigmay.cpp 
-sigmay.h 
 sigmaz.cpp 
-sigmaz.h 
 stau.cpp 
-stau.h 
-sx.h 
 sx0_fixedParameters.cpp 
 wrapfunctions.cpp 
 wrapfunctions.h 
-x.h 
 x0.cpp 
 x0_fixedParameters.cpp 
-xB.h 
-x_old.h 
 x_rdata.cpp 
-x_rdata.h 
 x_solver.cpp 
-x_solver.h 
 xdot.cpp 
-xdot.h 
-xdot_old.h 
 y.cpp 
-y.h 
-z.cpp 
-z.h  ${MODEL_DIR}/wrapfunctions.cpp)
+z.cpp  ${MODEL_DIR}/wrapfunctions.cpp)
 
 add_library(${PROJECT_NAME} ${SRC_LIST_LIB})
 

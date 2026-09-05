@@ -611,9 +611,9 @@ def test_t_overflow():
     model {module_name}
         # Constant increase so the solver will take large steps;
         #  small enough to let `t` to overflow before `x`.
-        dxx_dt = 1e-16
-        xx' = dxx_dt
-        xx = 0
+        dx_dt = 1e-16
+        x' = dx_dt
+        x = 0
     end
     """
     with TemporaryDirectory(prefix=module_name) as outdir:
@@ -621,7 +621,7 @@ def test_t_overflow():
             ant_str,
             model_name=module_name,
             output_dir=outdir,
-            fixed_parameters=["dxx_dt"],
+            fixed_parameters=["dx_dt"],
         )
         model.set_steady_state_computation_mode(
             SteadyStateComputationMode.integrationOnly

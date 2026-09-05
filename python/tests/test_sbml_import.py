@@ -417,8 +417,8 @@ def test_presimulation_events_and_sensitivities(tempdir):
 
     k_pre = 3
     k_main = 2
-    xx = 0
-    xx' = piecewise(k_pre, time < 0, k_main)
+    x = 0
+    x' = piecewise(k_pre, time < 0, k_main)
 
     at time < -1 , t0=false: some_time = some_time + bolus
     """,
@@ -793,7 +793,7 @@ def test_code_gen_uses_cse(extract_cse, tempdir):
             output_dir=tempdir,
         )
         xdot = Path(tempdir, "xdot.cpp").read_text()
-        assert ("__amici_cse_0 = " in xdot) == extract_cse
+        assert ("amici_cse_0_ = " in xdot) == extract_cse
     finally:
         os.environ = old_environ
 
@@ -811,7 +811,7 @@ def test_code_gen_uses_lhs_symbol_ids(tempdir):
         output_dir=tempdir,
     )
     dwdx = Path(tempdir, "dwdx.cpp").read_text()
-    assert "dobservable_x1_dx1 = " in dwdx
+    assert "dobservable_x1_dx1_ = " in dwdx
 
 
 @skip_on_valgrind
@@ -1019,8 +1019,8 @@ def test_regression_2700(tempdir):
     x' = 0
 
     a = 1
-    # condition is always true, so `pp` should be 1
-    pp := piecewise(1, a >= 1 && a <= 1, 0)
+    # condition is always true, so `p` should be 1
+    p := piecewise(1, a >= 1 && a <= 1, 0)
     """,
         model_name=model_name,
         output_dir=tempdir,
@@ -1031,7 +1031,7 @@ def test_regression_2700(tempdir):
     model.set_timepoints([0, 1, 2])
     rdata = model.simulate()
 
-    assert np.all(rdata.by_id("pp") == [1, 1, 1])
+    assert np.all(rdata.by_id("p") == [1, 1, 1])
 
 
 def test_heaviside_init_values_and_bool_to_float_conversion(tempdir):

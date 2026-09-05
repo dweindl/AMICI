@@ -541,7 +541,7 @@ class Model_model_calvetti_py : public amici::Model_DAE {
      * @return AMICI git commit hash
      */
     std::string get_amici_commit() const override {
-        return "89e6fe2bcbb1d0ff6d25478e1acaf17cd33a1761";
+        return "5d6d457fc1e217075c7074c8f844ac64b2a75084";
     }
 
     bool has_quadratic_llh() const override {

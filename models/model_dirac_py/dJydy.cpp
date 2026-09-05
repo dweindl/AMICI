@@ -45,19 +45,18 @@ void dJydy_rowvals_model_dirac_py(SUNMatrixWrapper &dJydy, int index){
 #include <algorithm>
 #include <sundials/sundials_types.h>
 #include <gsl/gsl-lite.hpp>
-#include "p.h"
-#include "y.h"
-#include "sigmay.h"
-#include "my.h"
-#include "dJydy.h"
 
 namespace amici {
 namespace model_model_dirac_py {
 
 void dJydy_model_dirac_py(realtype *dJydy, const int iy, const realtype *p, const realtype *k, const realtype *y, const realtype *sigmay, const realtype *my){
+    const realtype obs_x2_ = y[0];
+    const realtype sigma_obs_x2_ = sigmay[0];
+    const realtype mobs_x2_ = my[0];
+
     switch(iy) {
         case 0:
-            dJydy[0] = (-1.0*mobs_x2 + 1.0*obs_x2)/std::pow(sigma_obs_x2, 2);
+            dJydy[0] = (-1.0*mobs_x2_ + 1.0*obs_x2_)/std::pow(sigma_obs_x2_, 2);
             break;
     }
 }

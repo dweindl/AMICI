@@ -2,25 +2,30 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "p.h"
-#include "k.h"
-#include "y.h"
-#include "sigmay.h"
-#include "my.h"
 
 namespace amici {
 namespace model_model_jakstat_adjoint_py {
 
 void dJydsigma_model_jakstat_adjoint_py(realtype *dJydsigma, const int iy, const realtype *p, const realtype *k, const realtype *y, const realtype *sigmay, const realtype *my){
+    const realtype obs_pSTAT_ = y[0];
+    const realtype obs_tSTAT_ = y[1];
+    const realtype obs_spline_ = y[2];
+    const realtype sigma_obs_pSTAT_ = sigmay[0];
+    const realtype sigma_obs_tSTAT_ = sigmay[1];
+    const realtype sigma_obs_spline_ = sigmay[2];
+    const realtype mobs_pSTAT_ = my[0];
+    const realtype mobs_tSTAT_ = my[1];
+    const realtype mobs_spline_ = my[2];
+
     switch(iy) {
         case 0:
-            dJydsigma[0] = 1.0/sigma_obs_pSTAT - 1.0*std::pow(-mobs_pSTAT + obs_pSTAT, 2)/std::pow(sigma_obs_pSTAT, 3);
+            dJydsigma[0] = 1.0/sigma_obs_pSTAT_ - 1.0*std::pow(-mobs_pSTAT_ + obs_pSTAT_, 2)/std::pow(sigma_obs_pSTAT_, 3);
             break;
         case 1:
-            dJydsigma[1] = 1.0/sigma_obs_tSTAT - 1.0*std::pow(-mobs_tSTAT + obs_tSTAT, 2)/std::pow(sigma_obs_tSTAT, 3);
+            dJydsigma[1] = 1.0/sigma_obs_tSTAT_ - 1.0*std::pow(-mobs_tSTAT_ + obs_tSTAT_, 2)/std::pow(sigma_obs_tSTAT_, 3);
             break;
         case 2:
-            dJydsigma[2] = 1.0/sigma_obs_spline - 1.0*std::pow(-mobs_spline + obs_spline, 2)/std::pow(sigma_obs_spline, 3);
+            dJydsigma[2] = 1.0/sigma_obs_spline_ - 1.0*std::pow(-mobs_spline_ + obs_spline_, 2)/std::pow(sigma_obs_spline_, 3);
             break;
     }
 }

@@ -1321,7 +1321,7 @@ def _construct_conservation_from_prototypes(
             {
                 "state": symbol_with_assumptions(f"__s{target_index}"),
                 "total_abundance": symbol_with_assumptions(
-                    f"tcl__s{target_index}"
+                    f"tcl_s{target_index}"
                 ),
                 "coefficients": coefficients,
             }
@@ -1350,7 +1350,7 @@ def _add_conservation_for_constant_species(
             conservation_laws.append(
                 {
                     "state": symbol_with_assumptions(f"__s{ix}"),
-                    "total_abundance": symbol_with_assumptions(f"tcl__s{ix}"),
+                    "total_abundance": symbol_with_assumptions(f"tcl_s{ix}"),
                     "coefficients": {
                         symbol_with_assumptions(f"__s{ix}"): sp.Integer(1)
                     },

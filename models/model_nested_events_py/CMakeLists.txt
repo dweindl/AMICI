@@ -66,48 +66,30 @@ endif()
 set(MODEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(SRC_LIST_LIB Jy.cpp 
-Jy.h 
 create_splines.cpp 
 dJydsigma.cpp 
 dJydy.cpp 
-dJydy.h 
 deltaqB.cpp 
 deltasx.cpp 
 deltax.cpp 
 deltaxB.cpp 
 dxdotdp_explicit.cpp 
-dxdotdp_explicit.h 
 dxdotdx_explicit.cpp 
-dxdotdx_explicit.h 
 dydx.cpp 
 explicit_roots.cpp 
-h.h 
 model_nested_events_py.cpp 
 model_nested_events_py.h 
-my.h 
-p.h 
 root.cpp 
 sigmay.cpp 
-sigmay.h 
 stau.cpp 
-stau.h 
-sx.h 
 sx0.cpp 
 wrapfunctions.cpp 
 wrapfunctions.h 
-x.h 
 x0.cpp 
-xB.h 
-x_old.h 
 x_rdata.cpp 
-x_rdata.h 
 x_solver.cpp 
-x_solver.h 
 xdot.cpp 
-xdot.h 
-xdot_old.h 
-y.cpp 
-y.h  ${MODEL_DIR}/wrapfunctions.cpp)
+y.cpp  ${MODEL_DIR}/wrapfunctions.cpp)
 
 add_library(${PROJECT_NAME} ${SRC_LIST_LIB})
 

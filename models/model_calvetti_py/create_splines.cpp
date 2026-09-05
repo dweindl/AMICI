@@ -4,7 +4,6 @@
 #include <algorithm>
 #include "amici/splinefunctions.h"
 #include <vector>
-#include "k.h"
 
 namespace amici {
 namespace model_model_calvetti_py {

@@ -45,20 +45,18 @@ void dJydy_rowvals_model_neuron_py(SUNMatrixWrapper &dJydy, int index){
 #include <algorithm>
 #include <sundials/sundials_types.h>
 #include <gsl/gsl-lite.hpp>
-#include "p.h"
-#include "k.h"
-#include "y.h"
-#include "sigmay.h"
-#include "my.h"
-#include "dJydy.h"
 
 namespace amici {
 namespace model_model_neuron_py {
 
 void dJydy_model_neuron_py(realtype *dJydy, const int iy, const realtype *p, const realtype *k, const realtype *y, const realtype *sigmay, const realtype *my){
+    const realtype y1_ = y[0];
+    const realtype sigma_y1_ = sigmay[0];
+    const realtype my1_ = my[0];
+
     switch(iy) {
         case 0:
-            dJydy[0] = (-1.0*my1 + 1.0*y1)/std::pow(sigma_y1, 2);
+            dJydy[0] = (-1.0*my1_ + 1.0*y1_)/std::pow(sigma_y1_, 2);
             break;
     }
 }

@@ -601,6 +601,9 @@ class SbmlImporter:
             in ["normal", "lin-normal", "log-normal", "log10-normal"]
             for llh in self._symbols[SymbolId.LLHY].values()
         )
+        ode_model.reserved_symbol_original_ids = (
+            self._reserved_symbol_original_ids
+        )
 
         # add splines as expressions to the model
         # saved for later substituting into the fluxes
@@ -2817,11 +2820,33 @@ class SbmlImporter:
 
     def _clean_reserved_symbols(self) -> None:
         """
-        Remove all reserved symbols from self.symbols
+        Rename reserved symbols in ``self.symbols``, recording each original id.
+
+        The original id is kept so it can be restored for anything reported
+        outward (state/parameter ids, PEtab mapping, ...).
         """
+        self._reserved_symbol_original_ids: dict[str, str] = {}
+        all_names = {
+            s.name for symbols in self._symbols.values() for s in symbols
+        }
+
         for sym in RESERVED_SYMBOLS:
             old_symbol = symbol_with_assumptions(sym)
-            new_symbol = symbol_with_assumptions(f"amici_{sym}")
+            if not any(
+                old_symbol in symbols for symbols in self._symbols.values()
+            ):
+                continue
+
+            # the model may already define e.g. "amici_t" itself; keep
+            # trying suffixes until we land on a name that's actually free
+            new_name, n = f"amici_{sym}", 2
+            while new_name in all_names:
+                new_name = f"amici_{sym}_{n}"
+                n += 1
+            all_names.add(new_name)
+            self._reserved_symbol_original_ids[new_name] = sym
+
+            new_symbol = symbol_with_assumptions(new_name)
             self._replace_in_all_expressions(
                 old_symbol, new_symbol, replace_identifiers=True
             )

@@ -1,7 +1,24 @@
+import pytest
 import sympy as sp
-from amici._symbolic.de_model_components import Event
+from amici._symbolic.de_model_components import Event, FreeParameter
 from amici.importers.utils import amici_time_symbol
 from amici.testing import skip_on_valgrind
+
+
+@skip_on_valgrind
+def test_model_quantity_reserved_name():
+    """`t` and the fixed array-parameter names (x, p, k, h, w, y) are
+    reserved for ModelQuantity symbols: the JAX exporter has no mangling of
+    its own and relies on these being renamed before codegen ever sees
+    them (unlike the C++ backend, whose printer mangles every identifier).
+    A name that only collides with a C++ keyword/macro (e.g. NULL) is
+    handled by that mangling instead and doesn't need to be rejected
+    here."""
+    FreeParameter(symbol=sp.Symbol("NULL"), name="NULL", value=1.0)
+
+    for name in ("t", "x", "p", "k", "h", "w", "y"):
+        with pytest.raises(ValueError, match="Cannot add"):
+            FreeParameter(symbol=sp.Symbol(name), name=name, value=1.0)
 
 
 @skip_on_valgrind

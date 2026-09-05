@@ -66,49 +66,28 @@ endif()
 set(MODEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(SRC_LIST_LIB Jy.cpp 
-Jy.h 
 create_splines.cpp 
 dJydsigma.cpp 
 dJydy.cpp 
-dJydy.h 
 dwdw.cpp 
-dwdw.h 
 dwdx.cpp 
-dwdx.h 
-dx.h 
 dxdotdw.cpp 
-dxdotdw.h 
 dxdotdx_explicit.cpp 
-dxdotdx_explicit.h 
 dydx.cpp 
 explicit_roots.cpp 
-h.h 
-k.h 
 model_calvetti_py.cpp 
 model_calvetti_py.h 
-my.h 
 root.cpp 
 sigmay.cpp 
-sigmay.h 
-sx.h 
 w.cpp 
-w.h 
 wrapfunctions.cpp 
 wrapfunctions.h 
-x.h 
 x0.cpp 
 x0_fixedParameters.cpp 
-xB.h 
-x_old.h 
 x_rdata.cpp 
-x_rdata.h 
 x_solver.cpp 
-x_solver.h 
 xdot.cpp 
-xdot.h 
-xdot_old.h 
-y.cpp 
-y.h  ${MODEL_DIR}/wrapfunctions.cpp)
+y.cpp  ${MODEL_DIR}/wrapfunctions.cpp)
 
 add_library(${PROJECT_NAME} ${SRC_LIST_LIB})
 

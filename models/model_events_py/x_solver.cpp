@@ -2,15 +2,18 @@
 #include "amici/defines.h"
 
 #include <algorithm>
-#include "x_rdata.h"
 
 namespace amici {
 namespace model_model_events_py {
 
 void x_solver_model_events_py(realtype *x_solver, const realtype *x_rdata){
-    x_solver[0] = x1;
-    x_solver[1] = x2;
-    x_solver[2] = x3;
+    const realtype x1_ = x_rdata[0];
+    const realtype x2_ = x_rdata[1];
+    const realtype x3_ = x_rdata[2];
+
+    x_solver[0] = x1_;
+    x_solver[1] = x2_;
+    x_solver[2] = x3_;
 }
 
 } // namespace model_model_events_py
