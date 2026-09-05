@@ -29,7 +29,13 @@ See also our [versioning policy](https://amici.readthedocs.io/en/latest/versioni
   spline with an event trigger that depends on it now raise a clear error
   at import time instead of silently generating incorrect C++, since
   simulating such models is not yet supported (#3245).
-
+* Fixed a model entity's ID colliding with an AMICI-internally-derived
+  symbol name (e.g. a reaction's own flux symbol, a conservation-law
+  total, or an observable's measurement/sigma symbol) causing silently
+  incorrect simulation results or a C++ compilation failure. The derived
+  symbol is now disambiguated instead, and generated C++ locals are no
+  longer aliased across two different quantities that merely happen to
+  print the same name (#3240).
 * Fixed PySB/BNGL import failing with a `ValueError` when a model quantity
   was literally named one of AMICI's reserved argument names (`x`, `p`,
   `k`, `h`, `w`, `y`). These are now renamed internally and the original

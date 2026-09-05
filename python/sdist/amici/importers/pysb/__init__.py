@@ -42,6 +42,7 @@ from ..utils import (
     _get_str_symbol_identifiers,
     _parse_special_functions,
     generate_measurement_symbol,
+    make_name_unique,
     noise_distribution_to_cost_function,
     noise_distribution_to_observable_transformation,
     resolve_reserved_symbol_renames,
@@ -412,13 +413,14 @@ def ode_model_from_pysb_importer(
                 "Conservation law computation is not supported for models "
                 "with events. Use `compute_conservation_laws=False`."
             )
-        _process_pysb_conservation_laws(model, ode)
+        _process_pysb_conservation_laws(model, ode, all_names)
     _process_pysb_observables(
         model,
         ode,
         observation_model,
         pysb_model_has_obs_and_noise,
         renames,
+        all_names,
     )
     _process_pysb_expressions(
         model,
@@ -426,6 +428,7 @@ def ode_model_from_pysb_importer(
         observation_model,
         pysb_model_has_obs_and_noise,
         renames,
+        all_names,
     )
 
     for event in _events or []:
@@ -646,6 +649,7 @@ def _process_pysb_expressions(
     observation_model: dict[str, MeasurementChannel],
     pysb_model_has_obs_and_noise: bool = False,
     renames: dict[str, str] | None = None,
+    all_names: set[str] | None = None,
 ) -> None:
     r"""
     Converts pysb expressions/observables into Observables (with
@@ -670,6 +674,12 @@ def _process_pysb_expressions(
     :param renames:
         mapping from a PySB-chosen name to a non-colliding replacement, see
         `resolve_reserved_symbol_renames`
+
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate the observable's measurement/sigma/log-likelihood
+        symbols against, see
+        :func:`amici.importers.utils.make_name_unique` (#3240)
     """
     # we no longer expand expressions here. pysb/bng guarantees that
     # they are ordered according to their dependency and we can
@@ -698,6 +708,7 @@ def _process_pysb_expressions(
             observation_model,
             pysb_model_has_obs_and_noise,
             renames,
+            all_names,
         )
 
 
@@ -709,6 +720,7 @@ def _add_expression(
     observation_model: dict[str, MeasurementChannel],
     pysb_model_has_obs_and_noise: bool = False,
     renames: dict[str, str] | None = None,
+    all_names: set[str] | None = None,
 ):
     """
     Adds expressions to the ODE model given and adds observables/sigmas if
@@ -736,6 +748,12 @@ def _add_expression(
     :param renames:
         mapping from a PySB-chosen name to a non-colliding replacement, see
         `resolve_reserved_symbol_renames`
+
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate the observable's measurement/sigma/log-likelihood
+        symbols against, see
+        :func:`amici.importers.utils.make_name_unique` (#3240)
     """
     renames = renames or {}
     # `name` stays the original (used for `observation_model` lookups and
@@ -767,21 +785,30 @@ def _add_expression(
         # models and overwriting in JAX models, but as both symbols refer to
         # the same _symbolic entity, this should not be a problem (untested)
         expr = _parse_special_functions(_expr_to_amici(expr, renames))
-        obs = Observable(y, name, expr, transformation=trafo)
+        # mint (and, if needed, disambiguate, #3240) the measurement symbol
+        # up front and pass it into the `Observable` explicitly -- a later,
+        # independent call to `Observable.get_measurement_symbol()` (e.g.
+        # from `DEModel`'s own lazy "my" array construction) is not
+        # guaranteed to reproduce the same disambiguated symbol, since
+        # disambiguation depends on `all_names`' mutable state at the time
+        # of the call, not just on `name` itself
+        my = generate_measurement_symbol(y, taken_names=all_names)
+        obs = Observable(
+            y, name, expr, measurement_symbol=my, transformation=trafo
+        )
         ode_model.add_component(obs)
 
         sigma_name = observation_model[name].sigma
         if isinstance(sigma_name, sp.Symbol):
             sigma_name = sigma_name.name
 
-        sigma = _get_sigma(pysb_model, name, sigma_name, renames)
+        sigma = _get_sigma(pysb_model, name, sigma_name, renames, all_names)
         if not pysb_model_has_obs_and_noise:
             ode_model.add_component(
                 SigmaY(sigma, f"sigma_{name}", sp.Float(1.0))
             )
 
         cost_fun_str = noise_distribution_to_cost_function(noise_dist)(name)
-        my = generate_measurement_symbol(obs.get_sym())
         cost_fun_expr = sp.sympify(
             cost_fun_str,
             locals=dict(
@@ -793,9 +820,12 @@ def _add_expression(
             ),
         )
         cost_fun_expr = _expr_to_amici(cost_fun_expr, renames)
+        llh_symbol_name = f"llh_{name}"
+        if all_names is not None:
+            llh_symbol_name = make_name_unique(llh_symbol_name, all_names)
         ode_model.add_component(
             LogLikelihoodY(
-                symbol_with_assumptions(f"llh_{name}"),
+                symbol_with_assumptions(llh_symbol_name),
                 f"llh_{name}",
                 cost_fun_expr,
             )
@@ -807,6 +837,7 @@ def _get_sigma(
     obs_name: str,
     sigma_name: str | None,
     renames: dict[str, str] | None = None,
+    all_names: set[str] | None = None,
 ) -> sp.Symbol:
     """
     Tries to extract standard deviation _symbolic identifier and formula
@@ -827,11 +858,19 @@ def _get_sigma(
         mapping from a PySB-chosen name to a non-colliding replacement, see
         `resolve_reserved_symbol_renames`
 
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate the default sigma symbol against, see
+        :func:`amici.importers.utils.make_name_unique` (#3240)
+
     :return:
         _symbolic variable representing the standard deviation of the observable
     """
     if sigma_name is None:
-        return symbol_with_assumptions(f"sigma_{obs_name}")
+        name = f"sigma_{obs_name}"
+        if all_names is not None:
+            name = make_name_unique(name, all_names)
+        return symbol_with_assumptions(name)
 
     if sigma_name in pysb_model.expressions.keys():
         return _expr_to_amici(pysb_model.expressions[sigma_name], renames)
@@ -846,6 +885,7 @@ def _process_pysb_observables(
     observation_model: dict[str, MeasurementChannel],
     pysb_model_has_obs_and_noise: bool = False,
     renames: dict[str, str] | None = None,
+    all_names: set[str] | None = None,
 ) -> None:
     """
     Converts :class:`pysb.core.Observable` into
@@ -868,6 +908,11 @@ def _process_pysb_observables(
     :param renames:
         mapping from a PySB-chosen name to a non-colliding replacement, see
         `resolve_reserved_symbol_renames`
+
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate the observable's measurement/sigma symbols against,
+        see :func:`amici.importers.utils.make_name_unique` (#3240)
     """
     # only add those pysb observables that occur in the added
     # Observables as expressions
@@ -880,12 +925,13 @@ def _process_pysb_observables(
             observation_model,
             pysb_model_has_obs_and_noise,
             renames,
+            all_names,
         )
 
 
 @log_execution_time("computing PySB conservation laws", logger)
 def _process_pysb_conservation_laws(
-    pysb_model: pysb.Model, ode_model: DEModel
+    pysb_model: pysb.Model, ode_model: DEModel, all_names: set[str]
 ) -> None:
     """
     Removes species according to conservation laws to ensure that the
@@ -896,6 +942,11 @@ def _process_pysb_conservation_laws(
 
     :param ode_model:
         DEModel instance
+
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate conservation-law total symbols against, see
+        :func:`amici.importers.utils.make_name_unique` (#3240)
     """
 
     monomers_without_conservation_law = set()
@@ -912,9 +963,11 @@ def _process_pysb_conservation_laws(
         monomers_without_conservation_law, pysb_model, ode_model
     )
     conservation_laws = _construct_conservation_from_prototypes(
-        cl_prototypes, pysb_model
+        cl_prototypes, pysb_model, all_names
     )
-    _add_conservation_for_constant_species(ode_model, conservation_laws)
+    _add_conservation_for_constant_species(
+        ode_model, conservation_laws, all_names
+    )
 
     _flatten_conservation_laws(conservation_laws)
 
@@ -1366,7 +1419,9 @@ def _get_target_indices(cl_prototypes: CL_Prototype) -> list[list[int]]:
 
 
 def _construct_conservation_from_prototypes(
-    cl_prototypes: CL_Prototype, pysb_model: pysb.Model
+    cl_prototypes: CL_Prototype,
+    pysb_model: pysb.Model,
+    all_names: set[str],
 ) -> list[ConservationLaw]:
     """
     Computes the algebraic expression for the total amount of a given
@@ -1377,6 +1432,11 @@ def _construct_conservation_from_prototypes(
 
     :param pysb_model:
         pysb model
+
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate the conservation-law total symbol against, see
+        :func:`amici.importers.utils.make_name_unique` (#3240)
 
     :return:
         list of dicts describing conservation laws
@@ -1395,7 +1455,7 @@ def _construct_conservation_from_prototypes(
             {
                 "state": symbol_with_assumptions(f"__s{target_index}"),
                 "total_abundance": symbol_with_assumptions(
-                    f"tcl_s{target_index}"
+                    make_name_unique(f"tcl_s{target_index}", all_names)
                 ),
                 "coefficients": coefficients,
             }
@@ -1405,7 +1465,9 @@ def _construct_conservation_from_prototypes(
 
 
 def _add_conservation_for_constant_species(
-    ode_model: DEModel, conservation_laws: list[ConservationLaw]
+    ode_model: DEModel,
+    conservation_laws: list[ConservationLaw],
+    all_names: set[str],
 ) -> None:
     """
     Computes the algebraic expression for the total amount of a given
@@ -1417,6 +1479,11 @@ def _add_conservation_for_constant_species(
     :param conservation_laws:
         see return of :func:`_construct_conservation_from_prototypes`
 
+    :param all_names:
+        every name already claimed in the model so far; used to
+        disambiguate the conservation-law total symbol against, see
+        :func:`amici.importers.utils.make_name_unique` (#3240)
+
     """
 
     for ix in range(ode_model.num_states_rdata()):
@@ -1424,7 +1491,9 @@ def _add_conservation_for_constant_species(
             conservation_laws.append(
                 {
                     "state": symbol_with_assumptions(f"__s{ix}"),
-                    "total_abundance": symbol_with_assumptions(f"tcl_s{ix}"),
+                    "total_abundance": symbol_with_assumptions(
+                        make_name_unique(f"tcl_s{ix}", all_names)
+                    ),
                     "coefficients": {
                         symbol_with_assumptions(f"__s{ix}"): sp.Integer(1)
                     },
