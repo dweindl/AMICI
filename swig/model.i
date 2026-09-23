@@ -10,6 +10,7 @@ using namespace amici;
 // be exposed in swig
 %ignore add_adjoint_event_time_update;
 %ignore add_adjoint_event_update;
+%ignore add_adjoint_state_preeq_reinit_update;
 %ignore add_event_objective;
 %ignore add_event_objective_regularization;
 %ignore add_event_objective_sensitivity;

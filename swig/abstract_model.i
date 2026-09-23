@@ -35,10 +35,12 @@
 %ignore fdJzdz;
 %ignore fdJydsigmay;
 %ignore fdeltaqB;
+%ignore fdeltaqB_fixedParameters;
 %ignore fdeltasx;
 %ignore fdeltax;
 %ignore fdeltaxB;
 %ignore fdeltaxB_at_trigger;
+%ignore fdeltaxB_fixedParameters;
 %ignore fdtaudp;
 %ignore fdtaudx;
 %ignore fstauB;
