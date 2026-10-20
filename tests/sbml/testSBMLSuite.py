@@ -15,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -50,6 +51,49 @@ from utils import (
     verify_results,
     write_result_file,
 )
+
+
+# DEBUG (not for merging): dump fiddy check results for offline analysis
+def _dump_fd_results(check):
+    import functools
+    import itertools
+    import pickle
+    import re
+
+    dump_dir = os.environ.get("AMICI_FD_DUMP_DIR")
+    if not dump_dir:
+        return check
+    counter = itertools.count()
+
+    @functools.wraps(check)
+    def wrapper(function, point, expectation, *args, **kwargs):
+        result = check(function, point, expectation, *args, **kwargs)
+        node = os.environ.get("PYTEST_CURRENT_TEST", "unknown").split(" ")[0]
+        tag = os.environ.get("AMICI_FD_DUMP_TAG", "")
+        name = re.sub(
+            r"[^\w.\[\]-]+", "_", f"{node}{tag}_{os.getpid()}_{next(counter)}"
+        )
+        Path(dump_dir).mkdir(parents=True, exist_ok=True)
+        with open(Path(dump_dir, f"{name}.pkl"), "wb") as f:
+            pickle.dump(
+                {
+                    "node": node,
+                    "tag": tag,
+                    "check": check.__name__,
+                    "point": np.asarray(point),
+                    "expectation": np.asarray(expectation),
+                    "kwargs": kwargs,
+                    "result": result,
+                },
+                f,
+            )
+        return result
+
+    return wrapper
+
+
+check_gradient = _dump_fd_results(check_gradient)
+check_jacobian = _dump_fd_results(check_jacobian)
 
 # test cases for which the separate, autodiff-based JAX sensitivity
 # cross-check is additionally run (see `jax_sensitivity_check`)
