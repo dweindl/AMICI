@@ -12,7 +12,7 @@ jobs:
   jax-regression:
     name: JAX regression suite
 
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
