@@ -9,7 +9,7 @@ import contextlib
 import logging
 import os
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import benchmark_models_petab
@@ -43,6 +43,48 @@ from amici.sim.sundials.petab.v1 import (
 from fiddy import check_gradient
 from petab.v1.lint import measurement_table_has_timepoint_specific_mappings
 from petab.v1.visualize import plot_problem
+
+
+# DEBUG (not for merging): dump fiddy check results for offline analysis
+def _dump_fd_results(check):
+    import functools
+    import itertools
+    import pickle
+    import re
+
+    dump_dir = os.environ.get("AMICI_FD_DUMP_DIR")
+    if not dump_dir:
+        return check
+    counter = itertools.count()
+
+    @functools.wraps(check)
+    def wrapper(function, point, expectation, *args, **kwargs):
+        result = check(function, point, expectation, *args, **kwargs)
+        node = os.environ.get("PYTEST_CURRENT_TEST", "unknown").split(" ")[0]
+        tag = os.environ.get("AMICI_FD_DUMP_TAG", "")
+        name = re.sub(
+            r"[^\w.\[\]-]+", "_", f"{node}{tag}_{os.getpid()}_{next(counter)}"
+        )
+        Path(dump_dir).mkdir(parents=True, exist_ok=True)
+        with open(Path(dump_dir, f"{name}.pkl"), "wb") as f:
+            pickle.dump(
+                {
+                    "node": node,
+                    "tag": tag,
+                    "check": check.__name__,
+                    "point": np.asarray(point),
+                    "expectation": np.asarray(expectation),
+                    "kwargs": kwargs,
+                    "result": result,
+                },
+                f,
+            )
+        return result
+
+    return wrapper
+
+
+check_gradient = _dump_fd_results(check_gradient)
 
 # Enable various debug output
 debug = False
@@ -364,6 +406,11 @@ def test_benchmark_gradient(benchmark_problem, scale, sensitivity_method):
     # Only compute gradient for estimated parameters.
     parameter_ids = petab_problem.x_free_ids
     cur_settings = settings[problem_id]
+    # DEBUG (not for merging): Raia_CancerResearch2011 variants
+    if problem_id == "Raia_CancerResearch2011" and (
+        rtol_sim := os.environ.get("AMICI_RAIA_RTOL_SIM")
+    ):
+        cur_settings = replace(cur_settings, rtol_sim=float(rtol_sim))
 
     # Setup AMICI objects.
     amici_model = import_petab_problem(

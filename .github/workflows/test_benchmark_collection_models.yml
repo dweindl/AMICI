@@ -16,7 +16,7 @@ jobs:
   cpp:
     name: Benchmark Collection CPP
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     strategy:
       fail-fast: false
@@ -91,12 +91,32 @@ jobs:
     - name: Run tests
       env:
         AMICI_PARALLEL_COMPILE: ""
+        AMICI_FD_DUMP_DIR: ${{ github.workspace }}/fd_dump
       run: |
         pytest tests/benchmark_models/test_petab_benchmark.py \
           --durations=10 \
           --cov=amici \
           --cov-report=xml:"coverage_py.xml" \
           --cov-append \
+
+    - name: Raia_CancerResearch2011 rtol_sim variants
+      if: ${{ always() }}
+      env:
+        AMICI_PARALLEL_COMPILE: ""
+        AMICI_FD_DUMP_DIR: ${{ github.workspace }}/fd_dump
+      run: |
+        for rtol in 1e-13 1e-14; do
+          AMICI_RAIA_RTOL_SIM=$rtol AMICI_FD_DUMP_TAG=_rtol$rtol \
+            pytest tests/benchmark_models/test_petab_benchmark.py \
+            -k "test_benchmark_gradient and Raia_CancerResearch2011" || true
+        done
+
+    - name: "Upload artifact: fiddy results"
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: fd-dump-benchmark-${{ matrix.extract_subexpressions }}
+        path: fd_dump
 
     - name: Codecov Python
       if: (github.event_name == 'pull_request' || github.repository_owner == 'AMICI-dev') && github.actor != 'dependabot[bot]'
@@ -129,7 +149,7 @@ jobs:
 
   jax:
     name: Benchmark Collection JAX
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
