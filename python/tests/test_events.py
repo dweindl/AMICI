@@ -3260,6 +3260,89 @@ def test_dae_event_reads_algebraic_state_changed_by_event(
 
 
 @skip_on_valgrind
+def test_dae_trigger_time_algebraic_state_after_secondary_event(tempdir):
+    """Sensitivities for an event using values from the trigger time, which
+    reads an algebraic state and is executed after a secondary event.
+
+    `E1` triggers `E3`. `E2` is executed last and reads `z` at the state
+    before `E1`, whose algebraic states were determined with the Heaviside
+    variables before `E1`, i.e., `v = q * 0.9`, independent of `c`.
+    """
+    module_name = "dae_trigger_time_alg_after_secondary"
+    antimony2amici(
+        f"""
+        model {module_name}
+            const k = 0.5, p = 3, q = 0.7, c = 2
+            x = 1; y = 3; z = 2.1; v = 0; w = 0
+            x' = -k * x
+            v' = 0
+            w' = 0
+            0 = y - p * x
+            0 = z - piecewise(q * y, y > 0.9, c * y)
+            E1: at y < 0.9, priority=5, fromTrigger=false: x = x / 4
+            E2: at y < 0.9, priority=1, fromTrigger=true: v = v + z
+            E3: at x < 0.1, priority=4, fromTrigger=false: w = w + 1
+        end
+        """,
+        model_name=module_name,
+        output_dir=tempdir,
+        observation_model=[
+            MC("obs_x", formula="x"),
+            MC("obs_z", formula="z"),
+            MC("obs_v", formula="v"),
+            MC("obs_w", formula="w"),
+        ],
+    )
+    model = import_model_module(module_name, tempdir).get_model()
+    assert model.get_free_parameter_ids() == ("k", "p", "q", "c")
+    t = np.linspace(0, 4, 9)
+    model.set_timepoints(t)
+    edata = ExpData(model)
+    edata.set_measurements(np.full(len(t) * 4, 0.1))
+    edata.set_noise_scales(np.ones(len(t) * 4))
+
+    solver = model.create_solver()
+    solver.set_relative_tolerance(1e-12)
+    solver.set_absolute_tolerance(1e-12)
+    rdatas = {}
+    for method in (SensitivityMethod.forward, SensitivityMethod.adjoint):
+        solver.set_sensitivity_order(SensitivityOrder.first)
+        solver.set_sensitivity_method(method)
+        rdatas[method] = run_simulation(model, solver, edata)
+        assert rdatas[method].status == AMICI_SUCCESS
+
+    rdata = rdatas[SensitivityMethod.forward]
+    assert rdata.by_id("v")[-1] == pytest.approx(0.7 * 0.9)
+    assert rdata.by_id("w")[-1] == pytest.approx(1.0)
+    assert rdata.sx[-1, :, model.get_state_ids().index("v")] == (
+        pytest.approx([0, 0, 0.9, 0], abs=1e-6)
+    )
+
+    # central finite differences of the log-likelihood
+    p0 = np.asarray(model.get_free_parameters())
+    solver.set_sensitivity_order(SensitivityOrder.none)
+    sllh_fd = np.zeros(len(p0))
+    eps = 1e-4
+    for ip in range(len(p0)):
+        llh = []
+        for sign in (1, -1):
+            p = p0.copy()
+            p[ip] += sign * eps
+            model.set_free_parameters(p)
+            rdata_fd = run_simulation(model, solver, edata)
+            assert rdata_fd.status == AMICI_SUCCESS
+            llh.append(rdata_fd.llh)
+        sllh_fd[ip] = (llh[0] - llh[1]) / (2 * eps)
+    model.set_free_parameters(p0)
+    assert np.all(np.abs(sllh_fd) > 0.02)
+
+    for method, rdata in rdatas.items():
+        assert_allclose(
+            rdata.sllh, sllh_fd, rtol=1e-5, atol=1e-6, err_msg=method.name
+        )
+
+
+@skip_on_valgrind
 def test_dae_event_adjoint_sensitivities(tempdir):
     """Adjoint sensitivities of a DAE with an event that changes a
     differential state the algebraic state depends on."""
