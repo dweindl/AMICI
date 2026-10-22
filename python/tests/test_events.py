@@ -3036,6 +3036,86 @@ def test_dae_algebraic_rule_piecewise_adjoint(tempdir, trigger_state):
 
 @skip_on_valgrind
 @pytest.mark.parametrize("from_trigger", [True, False])
+@pytest.mark.parametrize("trigger_state", ["differential", "algebraic"])
+def test_dae_event_assignment_algebraic_switch_adjoint(
+    tempdir, trigger_state, from_trigger
+):
+    """Adjoint sensitivities of a DAE with an event assignment reading an
+    algebraic state whose equation switches at the event.
+
+    The derivative of the algebraic state w.r.t. the differential state
+    differs between the two branches of the `piecewise`.
+    """
+    if trigger_state == "differential":
+        # z(tau) = 0.3 * p
+        equations = """
+            z = 3
+            x' = -k * z
+            0 = y - p * x
+            0 = z - piecewise(y, x > 0.3, 2 * y - 0.3 * p)
+        """
+        trigger = "x < 0.3"
+        w_expected, dw_expected = 0.3 * 3, [0.0, 0.3, 0.0]
+    else:
+        # z(tau) = 0.9 * q
+        equations = """
+            z = 2.1
+            x' = -k * z
+            0 = y - p * x
+            0 = z - piecewise(q * y, y > 0.9, 2 * q * y - 0.9 * q)
+        """
+        trigger = "y < 0.9"
+        w_expected, dw_expected = 0.9 * 0.7, [0.0, 0.0, 0.9]
+    module_name = (
+        f"dae_event_assignment_algebraic_switch_{trigger_state}_{from_trigger}"
+    )
+    antimony2amici(
+        f"""
+        model {module_name}
+            const k = 0.5, p = 3, q = 0.7
+            x = 1; y = 3; w = 0
+            w' = 0
+            {equations}
+            E1: at {trigger}, fromTrigger={str(from_trigger).lower()}:
+                w = w + z
+        end
+        """,
+        model_name=module_name,
+        output_dir=tempdir,
+        observation_model=[
+            MC("obs_x", formula="x"),
+            MC("obs_w", formula="w"),
+        ],
+    )
+    model = import_model_module(module_name, tempdir).get_model()
+    assert model.get_free_parameter_ids() == ("k", "p", "q")
+    t = np.linspace(0, 4, 9)
+    model.set_timepoints(t)
+    edata = ExpData(model)
+    edata.set_measurements(np.full(len(t) * 2, 0.1))
+    edata.set_noise_scales(np.ones(len(t) * 2))
+
+    rdatas = {}
+    for method in (SensitivityMethod.forward, SensitivityMethod.adjoint):
+        solver = model.create_solver()
+        solver.set_sensitivity_order(SensitivityOrder.first)
+        solver.set_sensitivity_method(method)
+        solver.set_relative_tolerance(1e-12)
+        solver.set_absolute_tolerance(1e-12)
+        rdatas[method] = run_simulation(model, solver, edata)
+        assert rdatas[method].status == AMICI_SUCCESS
+
+    rdata = rdatas[SensitivityMethod.forward]
+    ix_w = model.get_state_ids().index("w")
+    assert_allclose(rdata.x[-1, ix_w], w_expected, rtol=1e-8)
+    assert_allclose(rdata.sx[-1, :, ix_w], dw_expected, rtol=1e-6, atol=1e-8)
+    assert_allclose(
+        rdatas[SensitivityMethod.adjoint].sllh, rdata.sllh, rtol=1e-6
+    )
+
+
+@skip_on_valgrind
+@pytest.mark.parametrize("from_trigger", [True, False])
 def test_dae_simultaneous_events_adjoint(tempdir, from_trigger):
     """Adjoint sensitivities of a DAE with simultaneous events, triggered by
     an algebraic state, with assignments depending on an algebraic state
