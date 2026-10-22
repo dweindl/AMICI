@@ -2,6 +2,9 @@
 #include "amici/solver_idas.h"
 #include "amici/sundials_linsol_wrapper.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <numeric>
 
 namespace amici {
@@ -327,6 +330,102 @@ void Model_DAE::project_algebraic_objective_derivatives(
     );
     for (int ip = 0; ip < nplist(); ++ip)
         dJydp[ip * nJ] -= correction[ip];
+}
+
+void Model_DAE::make_algebraic_derivatives_consistent(
+    realtype const t, AmiVector const& x, AmiVector& dx, AmiVectorArray* sx
+) {
+    // For the algebraic equations 0 = f_a(t, x, p), the time derivatives and
+    // the sensitivities v of the states satisfy
+    //   0 = df_a/dx v + r,
+    // with r = df_a/dt or r = df_a/dp, respectively. The algebraic
+    // components of v are corrected such that this holds, which is a single
+    // Newton step since the equations are linear in v.
+    // Algebraic equation i determines algebraic state i.
+    auto const& id = get_id_list();
+    std::vector<int> alg_states;
+    for (int ix = 0; ix < nx_solver; ++ix) {
+        if (id[ix] == 0.0)
+            alg_states.push_back(ix);
+    }
+    auto const n_alg = gsl::narrow<int>(alg_states.size());
+    if (n_alg == 0)
+        return;
+
+    // Explicit time dependence of the algebraic equations by central
+    // differences. The Heaviside variables are fixed, so this doesn't cross
+    // discontinuities.
+    AmiVector const zero(nx_solver, derived_state_.sunctx_);
+    AmiVector residual(nx_solver, derived_state_.sunctx_);
+    AmiVector residual_bwd(nx_solver, derived_state_.sunctx_);
+    auto const delta = std::cbrt(std::numeric_limits<realtype>::epsilon())
+                       * std::max(1.0, std::abs(t));
+    fxdot(t + delta, x, zero, residual);
+    fxdot(t - delta, x, zero, residual_bwd);
+    for (int ix = 0; ix < nx_solver; ++ix)
+        residual[ix] = (residual[ix] - residual_bwd[ix]) / (2.0 * delta);
+
+    // df_a/dx; the algebraic equations do not depend on dx
+    fJSparse(t, 0.0, x.get_nvector(), zero.get_nvector(), derived_state_.J_);
+    derived_state_.J_.refresh();
+    auto const& J = derived_state_.J_;
+
+    std::vector<int> alg_pos(nx_solver, -1);
+    for (int ia = 0; ia < n_alg; ++ia)
+        alg_pos[alg_states[ia]] = ia;
+
+    AmiVector b(n_alg, derived_state_.sunctx_);
+    SUNLinSolDense linsol(b);
+    auto& dfa_dxa = linsol.getMatrix();
+    dfa_dxa.zero();
+    for (int ix = 0; ix < nx_solver; ++ix) {
+        auto const ja = alg_pos[ix];
+        if (ja < 0)
+            continue;
+        for (auto idx = J.get_indexptr(ix); idx < J.get_indexptr(ix + 1);
+             ++idx) {
+            if (auto const ia = alg_pos[J.get_indexval(idx)]; ia >= 0)
+                dfa_dxa.set_data(ia, ja, J.get_data(idx));
+        }
+    }
+    try {
+        linsol.setup();
+    } catch (AmiException const&) {
+        throw AmiException(
+            "Singular algebraic Jacobian at t = %g: cannot compute "
+            "consistent derivatives of the algebraic states.",
+            t
+        );
+    }
+
+    // v_a -= (df_a/dx_a)^{-1} residual_a
+    auto correct = [&](AmiVector& v, AmiVector const& r) {
+        for (int ia = 0; ia < n_alg; ++ia)
+            b[ia] = r[alg_states[ia]];
+        if (auto const status
+            = linsol.solve(b.get_nvector(), b.get_nvector(), 0.0);
+            status != SUN_SUCCESS) {
+            throw AmiException(
+                "Computing consistent derivatives of the algebraic states "
+                "failed with code %d",
+                status
+            );
+        }
+        for (int ia = 0; ia < n_alg; ++ia)
+            v[alg_states[ia]] -= b[ia];
+    };
+
+    // `residual` holds df_a/dt
+    J.multiply(residual.get_nvector(), dx.get_nvector());
+    correct(dx, residual);
+
+    if (!sx)
+        return;
+    for (int ip = 0; ip < nplist(); ++ip) {
+        // df_a/dp + df_a/dx sx
+        fsxdot(t, x, zero, ip, (*sx)[ip], zero, residual);
+        correct((*sx)[ip], residual);
+    }
 }
 
 void Model_DAE::fM(realtype const /*t*/, const_N_Vector /*x*/) {

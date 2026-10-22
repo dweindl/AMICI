@@ -321,6 +321,11 @@ class Model_DAE : public Model {
         realtype t, AmiVector const& x, gsl::span<realtype> dJydx,
         gsl::span<realtype> dJydp
     ) override;
+
+    void make_algebraic_derivatives_consistent(
+        realtype t, AmiVector const& x, AmiVector& dx, AmiVectorArray* sx
+    ) override;
+
     void fdxdotdp(
         realtype const t, AmiVector const& x, AmiVector const& dx
     ) override {
