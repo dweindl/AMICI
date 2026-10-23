@@ -352,18 +352,9 @@ void Model_DAE::make_algebraic_derivatives_consistent(
     if (n_alg == 0)
         return;
 
-    // Explicit time dependence of the algebraic equations by central
-    // differences. The Heaviside variables are fixed, so this doesn't cross
-    // discontinuities.
     AmiVector const zero(nx_solver, derived_state_.sunctx_);
     AmiVector residual(nx_solver, derived_state_.sunctx_);
-    AmiVector residual_bwd(nx_solver, derived_state_.sunctx_);
-    auto const delta = std::cbrt(std::numeric_limits<realtype>::epsilon())
-                       * std::max(1.0, std::abs(t));
-    fxdot(t + delta, x, zero, residual);
-    fxdot(t - delta, x, zero, residual_bwd);
-    for (int ix = 0; ix < nx_solver; ++ix)
-        residual[ix] = (residual[ix] - residual_bwd[ix]) / (2.0 * delta);
+    fdxdotdt(t, x, residual);
 
     // df_a/dx; the algebraic equations do not depend on dx
     fJSparse(t, 0.0, x.get_nvector(), zero.get_nvector(), derived_state_.J_);
@@ -425,6 +416,66 @@ void Model_DAE::make_algebraic_derivatives_consistent(
         // df_a/dp + df_a/dx sx
         fsxdot(t, x, zero, ip, (*sx)[ip], zero, residual);
         correct((*sx)[ip], residual);
+    }
+}
+
+void Model_DAE::fdxdotdt(
+    realtype const t, AmiVector const& x, AmiVector& dxdotdt
+) {
+    auto const x_pos = compute_x_pos(x.get_nvector());
+    auto const* x_data = N_VGetArrayPointerConst(x_pos);
+    AmiVector const zero(nx_solver, derived_state_.sunctx_);
+    // w and dwdw
+    fdwdx(t, x_data, false);
+
+    dxdotdt.zero();
+    fdxdotdt_explicit(
+        dxdotdt.data(), t, x_data, state_.unscaled_parameters.data(),
+        state_.fixed_parameters.data(), state_.h.data(), zero.data(),
+        derived_state_.w_.data()
+    );
+    if (!nw)
+        return;
+
+    // dxdotdt += dxdotdw * dwdt, with the total time derivative of w at
+    // fixed x: dwdt = sum_k dwdw^k dwdt_explicit
+    // Time derivatives of splines are not implemented yet (they would have to
+    // be evaluated here). NaN makes any algebraic equation that depends on
+    // them non-finite, which is caught below.
+    std::vector<realtype> const dspl(
+        nspl, std::numeric_limits<realtype>::quiet_NaN()
+    );
+    std::vector<realtype> dwdt_k(nw, 0.0);
+    fdwdt(
+        dwdt_k.data(), t, x_data, state_.unscaled_parameters.data(),
+        state_.fixed_parameters.data(), state_.h.data(),
+        derived_state_.w_.data(), state_.total_cl.data(),
+        derived_state_.spl_.data(), dspl.data()
+    );
+    auto dwdt = dwdt_k;
+    std::vector<realtype> tmp(nw);
+    for (int irecursion = 1; irecursion <= w_recursion_depth; irecursion++) {
+        std::ranges::fill(tmp, 0.0);
+        derived_state_.dwdw_.multiply(tmp, dwdt_k);
+        std::swap(tmp, dwdt_k);
+        for (int iw = 0; iw < nw; ++iw)
+            dwdt[iw] += dwdt_k[iw];
+    }
+    fdxdotdw(t, x_pos, zero.get_nvector());
+    derived_state_.dxdotdw_.multiply(
+        gsl::make_span(dxdotdt.data(), nx_solver), dwdt
+    );
+    auto const& id = get_id_list();
+    for (int ix = 0; ix < nx_solver; ++ix) {
+        if (id[ix] != 0.0)
+            dxdotdt[ix] = 0.0;
+        else if (!std::isfinite(dxdotdt[ix]))
+            throw AmiException(
+                "Non-finite time derivative of algebraic equation %d at "
+                "t = %g. Note that time derivatives of splines are not "
+                "supported yet.",
+                ix, t
+            );
     }
 }
 

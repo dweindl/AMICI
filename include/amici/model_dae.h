@@ -326,6 +326,19 @@ class Model_DAE : public Model {
         realtype t, AmiVector const& x, AmiVector& dx, AmiVectorArray* sx
     ) override;
 
+    /**
+     * @brief Explicit time derivative of the algebraic equations.
+     *
+     * Partial derivative with respect to time at fixed states and Heaviside
+     * variables, including the time dependence via `w`.
+     * The components for the differential equations are zero.
+     *
+     * @param t timepoint
+     * @param x Vector with the states
+     * @param dxdotdt output vector
+     */
+    void fdxdotdt(realtype t, AmiVector const& x, AmiVector& dxdotdt);
+
     void fdxdotdp(
         realtype const t, AmiVector const& x, AmiVector const& dx
     ) override {

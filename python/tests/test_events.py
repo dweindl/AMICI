@@ -27,6 +27,7 @@ from amici.testing import skip_on_valgrind
 from amici.testing.models import create_amici_model, create_sbml_model
 from fiddy import check_gradient
 from numpy.testing import assert_allclose
+from scipy.optimize import brentq
 from util import (
     check_trajectories_with_adjoint_sensitivities,
     check_trajectories_with_forward_sensitivities,
@@ -3173,9 +3174,9 @@ def test_dae_simultaneous_events_adjoint(tempdir, from_trigger):
 
 
 @skip_on_valgrind
-@pytest.mark.parametrize("time_dependent", [False, True])
+@pytest.mark.parametrize("time_dependence", [None, "explicit", "assignment"])
 def test_dae_event_reads_algebraic_state_changed_by_event(
-    tempdir, time_dependent
+    tempdir, time_dependence
 ):
     """Sensitivities for an event reading an algebraic state that a
     simultaneous event changed.
@@ -3183,11 +3184,17 @@ def test_dae_event_reads_algebraic_state_changed_by_event(
     `E1` changes `x`, which changes `z`. `E2` is applied after `E1` and
     reads the post-`E1` `z`, whose equation switches at the event time.
     Optionally, `E1` and the algebraic equation depend on time, such
-    that the time derivative of the post-`E1` `z` matters.
+    that the time derivative of the post-`E1` `z` matters. The algebraic
+    equation depends on time directly or via an assignment rule.
     """
-    t_term = " + 0.05 * time" if time_dependent else ""
-    alg_t_term = " - 0.3 * time" if time_dependent else ""
-    module_name = f"dae_event_reads_changed_alg_{time_dependent}"
+    # time coefficients of the algebraic equation and of `E1`
+    c_a, c_e = (0.3, 0.05) if time_dependence else (0.0, 0.0)
+    alg_t_term = {
+        None: "",
+        "explicit": " + 0.3 * time",
+        "assignment": " + s",
+    }[time_dependence]
+    module_name = f"dae_event_reads_changed_alg_{time_dependence}"
     antimony2amici(
         f"""
         model {module_name}
@@ -3197,8 +3204,9 @@ def test_dae_event_reads_algebraic_state_changed_by_event(
             w' = 0
             0 = y - p * x
             0 = z - piecewise(y, y > 0.9, 2 * y - 0.9){alg_t_term}
+            {"s := 0.3 * time" if time_dependence == "assignment" else ""}
             E1: at y < 0.9, priority=2, fromTrigger=false:
-                x = q * x{t_term}
+                x = q * x + {c_e} * time
             E2: at y < 0.9, priority=1, fromTrigger=false: w = w + z
         end
         """,
@@ -3227,36 +3235,48 @@ def test_dae_event_reads_algebraic_state_changed_by_event(
         rdatas[method] = run_simulation(model, solver, edata)
         assert rdatas[method].status == AMICI_SUCCESS
 
+    # Before the event, z = p * x - c_a * t, so
+    # x(t) = C * exp(-k * p * t) + c_a / p * (t - 1 / (k * p)).
+    # The trigger time tau solves p * x(tau) = 0.9. After `E1`,
+    # z = 2 * p * x - 0.9 - c_a * t, with x = q * 0.9 / p + c_e * tau, so
+    # w = 1.8 * q - 0.9 + (2 * p * c_e - c_a) * tau.
+    # For p = 3, the coefficient of tau vanishes, but not its contributions
+    # via the time derivatives of x and z.
+    k, p = 0.5, 3.0
+    a = k * p
+    C = 1 + c_a / (p * a)
+
+    def trigger(t_):
+        return p * (C * np.exp(-a * t_) + c_a / p * (t_ - 1 / a)) - 0.9
+
+    # first crossing; p * x(t) increases again later if c_a > 0
+    tau = brentq(trigger, 0, 2)
     rdata = rdatas[SensitivityMethod.forward]
-    if not time_dependent:
-        # w = z = 2 * p * q * x - 0.9 with p * x = 0.9 at the trigger
-        assert rdata.by_id("w")[-1] == pytest.approx(1.8 * 0.7 - 0.9)
-        assert rdata.sx[-1, :, model.get_state_ids().index("w")] == (
-            pytest.approx([0, 0, 1.8], abs=1e-6)
-        )
+    assert rdata.by_id("w")[-1] == pytest.approx(1.8 * 0.7 - 0.9)
+    assert_allclose(
+        rdata.sx[-1, :, model.get_state_ids().index("w")],
+        [0, 2 * c_e * tau, 1.8],
+        rtol=1e-6,
+        atol=1e-8,
+    )
 
-    # central finite differences of the log-likelihood
-    p0 = np.asarray(model.get_free_parameters())
-    solver.set_sensitivity_order(SensitivityOrder.none)
-    sllh_fd = np.zeros(len(p0))
-    eps = 1e-4
-    for ip in range(len(p0)):
-        llh = []
-        for sign in (1, -1):
-            p = p0.copy()
-            p[ip] += sign * eps
-            model.set_free_parameters(p)
-            rdata_fd = run_simulation(model, solver, edata)
-            assert rdata_fd.status == AMICI_SUCCESS
-            llh.append(rdata_fd.llh)
-        sllh_fd[ip] = (llh[0] - llh[1]) / (2 * eps)
-    model.set_free_parameters(p0)
-    assert np.all(np.abs(sllh_fd) > 0.02)
-
+    function, _ = run_simulation_to_function_and_derivative(
+        amici_model=model,
+        amici_solver=solver,
+        amici_edata=edata,
+        derivative_variables=["llh"],
+    )
+    point = np.asarray(model.get_free_parameters())
     for method, rdata in rdatas.items():
-        assert_allclose(
-            rdata.sllh, sllh_fd, rtol=1e-5, atol=1e-6, err_msg=method.name
+        assert np.all(np.abs(rdata.sllh) > 5e-3), method.name
+        check_gradient(function, point, rdata.sllh).assert_success(
+            always_print=True
         )
+    assert_allclose(
+        rdatas[SensitivityMethod.adjoint].sllh,
+        rdatas[SensitivityMethod.forward].sllh,
+        rtol=1e-6,
+    )
 
 
 @skip_on_valgrind
@@ -3318,28 +3338,23 @@ def test_dae_trigger_time_algebraic_state_after_secondary_event(tempdir):
         pytest.approx([0, 0, 0.9, 0], abs=1e-6)
     )
 
-    # central finite differences of the log-likelihood
-    p0 = np.asarray(model.get_free_parameters())
-    solver.set_sensitivity_order(SensitivityOrder.none)
-    sllh_fd = np.zeros(len(p0))
-    eps = 1e-4
-    for ip in range(len(p0)):
-        llh = []
-        for sign in (1, -1):
-            p = p0.copy()
-            p[ip] += sign * eps
-            model.set_free_parameters(p)
-            rdata_fd = run_simulation(model, solver, edata)
-            assert rdata_fd.status == AMICI_SUCCESS
-            llh.append(rdata_fd.llh)
-        sllh_fd[ip] = (llh[0] - llh[1]) / (2 * eps)
-    model.set_free_parameters(p0)
-    assert np.all(np.abs(sllh_fd) > 0.02)
-
+    function, _ = run_simulation_to_function_and_derivative(
+        amici_model=model,
+        amici_solver=solver,
+        amici_edata=edata,
+        derivative_variables=["llh"],
+    )
+    point = np.asarray(model.get_free_parameters())
     for method, rdata in rdatas.items():
-        assert_allclose(
-            rdata.sllh, sllh_fd, rtol=1e-5, atol=1e-6, err_msg=method.name
+        assert np.all(np.abs(rdata.sllh) > 5e-3), method.name
+        check_gradient(function, point, rdata.sllh).assert_success(
+            always_print=True
         )
+    assert_allclose(
+        rdatas[SensitivityMethod.adjoint].sllh,
+        rdatas[SensitivityMethod.forward].sllh,
+        rtol=1e-6,
+    )
 
 
 @skip_on_valgrind
