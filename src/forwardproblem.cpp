@@ -792,8 +792,9 @@ int EventHandlingSimulator::detect_secondary_events() {
     model_->froot(ws_->sol.t, ws_->sol.x, ws_->sol.dx, ws_->rootvals);
     auto const& h = model_->get_model_state().h;
 
-    // Change of the root function values if the states change by the
-    // integration tolerances, computed on demand.
+    // Estimated change of the root functions within the integration
+    // tolerances, |g(x + d) - g(x)| with d_i = atol + rtol * |x_i| (likewise
+    // for dx). Only computed if needed.
     std::vector<realtype> root_noise;
     auto const compute_root_noise = [this, &root_noise]() {
         auto const rtol = solver_->get_relative_tolerance();
