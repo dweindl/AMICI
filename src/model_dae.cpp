@@ -229,6 +229,60 @@ void Model_DAE::initialize_state_derivatives(
     }
 }
 
+namespace {
+/**
+ * @brief Indices of the algebraic states, and the position of each state
+ * among them (-1 for differential states).
+ */
+std::pair<std::vector<int>, std::vector<int>>
+algebraic_state_indices(std::vector<realtype> const& id) {
+    std::vector<int> alg_states;
+    std::vector<int> alg_pos(id.size(), -1);
+    for (std::size_t ix = 0; ix < id.size(); ++ix) {
+        if (id[ix] == 0.0) {
+            alg_pos[ix] = gsl::narrow<int>(alg_states.size());
+            alg_states.push_back(gsl::narrow<int>(ix));
+        }
+    }
+    return {alg_states, alg_pos};
+}
+} // namespace
+
+void Model_DAE::setup_algebraic_jacobian_solver(
+    realtype const t, AmiVector const& x, std::vector<int> const& alg_pos,
+    bool const transpose, char const* purpose, SUNLinSolDense& linsol
+) {
+    // the algebraic equations do not depend on dx
+    AmiVector const zero(nx_solver, derived_state_.sunctx_);
+    fJSparse(t, 0.0, x.get_nvector(), zero.get_nvector(), derived_state_.J_);
+    derived_state_.J_.refresh();
+    auto const& J = derived_state_.J_;
+
+    auto& A = linsol.getMatrix();
+    A.zero();
+    for (int ix = 0; ix < nx_solver; ++ix) {
+        auto const col = alg_pos[ix];
+        if (col < 0)
+            continue;
+        for (auto idx = J.get_indexptr(ix); idx < J.get_indexptr(ix + 1);
+             ++idx) {
+            if (auto const row = alg_pos[J.get_indexval(idx)]; row >= 0) {
+                if (transpose)
+                    A.set_data(col, row, J.get_data(idx));
+                else
+                    A.set_data(row, col, J.get_data(idx));
+            }
+        }
+    }
+    try {
+        linsol.setup();
+    } catch (AmiException const&) {
+        throw AmiException(
+            "Singular algebraic Jacobian at t = %g: cannot %s.", t, purpose
+        );
+    }
+}
+
 void Model_DAE::project_algebraic_objective_derivatives(
     realtype const t, AmiVector const& x, gsl::span<realtype> dJydx,
     gsl::span<realtype> dJydp
@@ -241,16 +295,7 @@ void Model_DAE::project_algebraic_objective_derivatives(
     // where (df_a/dx_a)^T mu = J_{x_a}.
     // Algebraic equation i determines algebraic state i. Only first-order
     // derivatives (entries iJ == 0, stride nJ) are handled.
-    auto const& id = get_id_list();
-    // position among the algebraic states, or -1 for differential states
-    std::vector<int> alg_pos(nx_solver, -1);
-    std::vector<int> alg_states;
-    for (int ix = 0; ix < nx_solver; ++ix) {
-        if (id[ix] == 0.0) {
-            alg_pos[ix] = gsl::narrow<int>(alg_states.size());
-            alg_states.push_back(ix);
-        }
-    }
+    auto const [alg_states, alg_pos] = algebraic_state_indices(get_id_list());
     auto const n_alg = gsl::narrow<int>(alg_states.size());
     if (n_alg == 0)
         return;
@@ -264,36 +309,13 @@ void Model_DAE::project_algebraic_objective_derivatives(
     if (!any_nonzero)
         return;
 
-    // dF/dx; the algebraic equations do not depend on dx
-    AmiVector dx(nx_solver, derived_state_.sunctx_);
-    dx.zero();
-    fJSparse(t, 0.0, x.get_nvector(), dx.get_nvector(), derived_state_.J_);
-    derived_state_.J_.refresh();
-    auto const& J = derived_state_.J_;
-
     // solve (df_a/dx_a)^T mu = J_{x_a}
     SUNLinSolDense linsol(mu);
-    auto& dfa_dxa_T = linsol.getMatrix();
-    dfa_dxa_T.zero();
-    for (int ix = 0; ix < nx_solver; ++ix) {
-        auto const ia = alg_pos[ix];
-        if (ia < 0)
-            continue;
-        for (auto idx = J.get_indexptr(ix); idx < J.get_indexptr(ix + 1);
-             ++idx) {
-            if (auto const ja = alg_pos[J.get_indexval(idx)]; ja >= 0)
-                dfa_dxa_T.set_data(ia, ja, J.get_data(idx));
-        }
-    }
-    try {
-        linsol.setup();
-    } catch (AmiException const&) {
-        throw AmiException(
-            "Singular algebraic Jacobian at t = %g: cannot map objective "
-            "derivatives w.r.t. algebraic states.",
-            t
-        );
-    }
+    setup_algebraic_jacobian_solver(
+        t, x, alg_pos, true,
+        "map objective derivatives w.r.t. algebraic states", linsol
+    );
+    auto const& J = derived_state_.J_;
     if (auto const status
         = linsol.solve(mu.get_nvector(), mu.get_nvector(), 0.0);
         status != SUN_SUCCESS) {
@@ -322,8 +344,9 @@ void Model_DAE::project_algebraic_objective_derivatives(
     if (dJydp.empty())
         return;
 
-    // dJ/dp -= (df_a/dp)^T mu
-    fdxdotdp(t, x.get_nvector(), dx.get_nvector());
+    // dJ/dp -= (df_a/dp)^T mu; the algebraic equations do not depend on dx
+    AmiVector const zero(nx_solver, derived_state_.sunctx_);
+    fdxdotdp(t, x.get_nvector(), zero.get_nvector());
     correction.assign(nplist(), 0.0);
     derived_state_.dxdotdp_full.multiply(
         correction, mu_full, state_.plist, true
@@ -342,12 +365,7 @@ void Model_DAE::make_algebraic_derivatives_consistent(
     // components of v are corrected such that this holds, which is a single
     // Newton step since the equations are linear in v.
     // Algebraic equation i determines algebraic state i.
-    auto const& id = get_id_list();
-    std::vector<int> alg_states;
-    for (int ix = 0; ix < nx_solver; ++ix) {
-        if (id[ix] == 0.0)
-            alg_states.push_back(ix);
-    }
+    auto const [alg_states, alg_pos] = algebraic_state_indices(get_id_list());
     auto const n_alg = gsl::narrow<int>(alg_states.size());
     if (n_alg == 0)
         return;
@@ -356,38 +374,13 @@ void Model_DAE::make_algebraic_derivatives_consistent(
     AmiVector residual(nx_solver, derived_state_.sunctx_);
     fdxdotdt(t, x, residual);
 
-    // df_a/dx; the algebraic equations do not depend on dx
-    fJSparse(t, 0.0, x.get_nvector(), zero.get_nvector(), derived_state_.J_);
-    derived_state_.J_.refresh();
-    auto const& J = derived_state_.J_;
-
-    std::vector<int> alg_pos(nx_solver, -1);
-    for (int ia = 0; ia < n_alg; ++ia)
-        alg_pos[alg_states[ia]] = ia;
-
     AmiVector b(n_alg, derived_state_.sunctx_);
     SUNLinSolDense linsol(b);
-    auto& dfa_dxa = linsol.getMatrix();
-    dfa_dxa.zero();
-    for (int ix = 0; ix < nx_solver; ++ix) {
-        auto const ja = alg_pos[ix];
-        if (ja < 0)
-            continue;
-        for (auto idx = J.get_indexptr(ix); idx < J.get_indexptr(ix + 1);
-             ++idx) {
-            if (auto const ia = alg_pos[J.get_indexval(idx)]; ia >= 0)
-                dfa_dxa.set_data(ia, ja, J.get_data(idx));
-        }
-    }
-    try {
-        linsol.setup();
-    } catch (AmiException const&) {
-        throw AmiException(
-            "Singular algebraic Jacobian at t = %g: cannot compute "
-            "consistent derivatives of the algebraic states.",
-            t
-        );
-    }
+    setup_algebraic_jacobian_solver(
+        t, x, alg_pos, false,
+        "compute consistent derivatives of the algebraic states", linsol
+    );
+    auto const& J = derived_state_.J_;
 
     // v_a -= (df_a/dx_a)^{-1} residual_a
     auto correct = [&](AmiVector& v, AmiVector const& r) {

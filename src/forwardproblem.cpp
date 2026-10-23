@@ -615,13 +615,6 @@ void EventHandlingSimulator::handle_events(
             ws_->sol.t, ws_->sol.x, ws_->sol.dx,
             next_output_timepoint(*model_, ws_->sol.t)
         );
-        if (solver_->computing_fsa() || solver_->computing_asa()) {
-            // `IDACalcIC` doesn't update the derivatives of the algebraic
-            // states, which subsequent events may depend on.
-            model_->make_algebraic_derivatives_consistent(
-                ws_->sol.t, ws_->sol.x, ws_->sol.dx, nullptr
-            );
-        }
         if (solver_->computing_fsa()) {
             // compute the new xdot
             model_->fdxdt(ws_->sol.t, ws_->sol.x, ws_->sol.dx, ws_->xdot);
@@ -635,18 +628,22 @@ void EventHandlingSimulator::handle_events(
                                              : ws_->sol.sx,
                 ws_->stau, h_assign
             );
-            // The sensitivities of the algebraic states are determined by
-            // the post-event differential states, which subsequent events
-            // may depend on.
+        }
+        if (solver_->computing_fsa() || solver_->computing_asa()) {
+            // `IDACalcIC` doesn't update the derivatives and sensitivities of
+            // the algebraic states, which subsequent events may depend on.
+            // Their stale values in `xdot` above only enter the algebraic
+            // components of `sx`, which are recomputed here.
             model_->make_algebraic_derivatives_consistent(
-                ws_->sol.t, ws_->sol.x, ws_->sol.dx, &ws_->sol.sx
+                ws_->sol.t, ws_->sol.x, ws_->sol.dx,
+                solver_->computing_fsa() ? &ws_->sol.sx : nullptr
             );
+            model_->fdxdt(ws_->sol.t, ws_->sol.x, ws_->sol.dx, ws_->xdot);
         }
         // store post-event state
         if (event_application) {
             event_application->x_post = ws_->sol.x;
             event_application->dx_post = ws_->sol.dx;
-            model_->fdxdt(ws_->sol.t, ws_->sol.x, ws_->sol.dx, ws_->xdot);
             event_application->xdot_post = ws_->xdot;
             result.discs.back().event_applications.push_back(
                 *std::move(event_application)

@@ -13,6 +13,7 @@ namespace amici {
 
 class ExpData;
 class IDASolver;
+class SUNLinSolDense;
 
 /**
  * @brief The Model class represents an AMICI DAE model.
@@ -377,6 +378,25 @@ class Model_DAE : public Model {
     std::unique_ptr<Solver> create_solver() override;
 
   protected:
+    /**
+     * @brief Set up a solver for the Jacobian of the algebraic equations
+     * w.r.t. the algebraic states.
+     *
+     * Evaluates the full Jacobian into `derived_state_.J_`.
+     *
+     * @param t timepoint
+     * @param x Vector with the states
+     * @param alg_pos Position of each state among the algebraic states, or
+     * -1 for differential states
+     * @param transpose Whether to factorize the transposed Jacobian
+     * @param purpose What the solver is used for, for error messages
+     * @param linsol Dense solver of the size of the algebraic states
+     */
+    void setup_algebraic_jacobian_solver(
+        realtype t, AmiVector const& x, std::vector<int> const& alg_pos,
+        bool transpose, char const* purpose, SUNLinSolDense& linsol
+    );
+
     /**
      * @brief Compute consistent initial derivatives of the differential
      * states and of their sensitivities.
