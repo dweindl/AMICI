@@ -3269,9 +3269,10 @@ def test_dae_event_reads_algebraic_state_changed_by_event(
     point = np.asarray(model.get_free_parameters())
     for method, rdata in rdatas.items():
         assert np.all(np.abs(rdata.sllh) > 5e-3), method.name
-        check_gradient(function, point, rdata.sllh).assert_success(
-            always_print=True
-        )
+        result = check_gradient(function, point, rdata.sllh)
+        result.assert_success(always_print=True)
+        # inconclusive directions don't fail `assert_success`
+        assert all(r.outcome == "passed" for r in result.direction_results)
     assert_allclose(
         rdatas[SensitivityMethod.adjoint].sllh,
         rdatas[SensitivityMethod.forward].sllh,
@@ -3315,7 +3316,10 @@ def test_dae_trigger_time_algebraic_state_after_secondary_event(tempdir):
     )
     model = import_model_module(module_name, tempdir).get_model()
     assert model.get_free_parameter_ids() == ("k", "p", "q", "c")
-    t = np.linspace(0, 4, 9)
+    # No timepoint close to the trigger time (ln(10/3) / k = 2.41).
+    # Otherwise, the finite differences for `k` and `p` would move the
+    # trigger time across that timepoint and be inconclusive.
+    t = [0, 0.5, 1, 1.5, 2, 3, 3.5, 4]
     model.set_timepoints(t)
     edata = ExpData(model)
     edata.set_measurements(np.full(len(t) * 4, 0.1))
@@ -3347,9 +3351,10 @@ def test_dae_trigger_time_algebraic_state_after_secondary_event(tempdir):
     point = np.asarray(model.get_free_parameters())
     for method, rdata in rdatas.items():
         assert np.all(np.abs(rdata.sllh) > 5e-3), method.name
-        check_gradient(function, point, rdata.sllh).assert_success(
-            always_print=True
-        )
+        result = check_gradient(function, point, rdata.sllh)
+        result.assert_success(always_print=True)
+        # inconclusive directions don't fail `assert_success`
+        assert all(r.outcome == "passed" for r in result.direction_results)
     assert_allclose(
         rdatas[SensitivityMethod.adjoint].sllh,
         rdatas[SensitivityMethod.forward].sllh,
