@@ -3437,21 +3437,28 @@ def test_event_moves_own_trigger_time(tempdir):
 
 
 @skip_on_valgrind
-def test_event_assignment_onto_threshold(tempdir):
-    """An event assignment that sets a just-crossed root function to exactly
-    zero does not cross it back."""
-    model_name = "test_event_assignment_onto_threshold"
+@pytest.mark.parametrize("x_new", ["xmax", "0.3"])
+def test_event_assignment_onto_threshold(tempdir, x_new):
+    """An event assignment that sets a just-crossed root function to zero,
+    exactly or up to rounding errors, does not cross it back.
+
+    `xmax` is computed at runtime, `0.1 + 0.2 = 0.30000000000000004`, so
+    `x = 0.3` is one rounding error below it.
+    """
+    model_name = f"test_event_assignment_onto_threshold_{x_new != 'xmax'}"
     antimony2amici(
-        r"""
-        r = 1; xmax = 2
-        x = 1; x' = piecewise(r, x < xmax, 0)
-        E: at x > xmax: x = xmax
+        rf"""
+        r = 1; a = 0.1; b = 0.2
+        xmax := a + b
+        x = 0; x' = piecewise(r, x < xmax, 0)
+        E: at x > xmax: x = {x_new}
         """,
         model_name=model_name,
         output_dir=tempdir,
     )
     model = import_model_module(model_name, tempdir).get_model()
-    model.set_timepoints([0.0, 1.5, 3.0])
+    model.set_timepoints([0.0, 1.0, 2.0])
     rdata = run_simulation(model, model.create_solver())
     assert rdata.status == AMICI_SUCCESS
-    assert_allclose(rdata.by_id("x"), [1.0, 2.0, 2.0], rtol=1e-8)
+    x_expected = 0.1 + 0.2 if x_new == "xmax" else 0.3
+    assert_allclose(rdata.by_id("x"), [0.0, x_expected, x_expected], rtol=1e-8)
