@@ -101,7 +101,7 @@ diffrax-dev = [
 ]
 fiddy = [
     # TODO: switch back to a PyPI release once the fiddy redesign ships
-    "fiddy @ git+https://github.com/ICB-DCM/fiddy.git@24b94be98a5f0c09998d6c617a461f8f5b73bcbe",
+    "fiddy @ git+https://github.com/ICB-DCM/fiddy.git@a9e8336edef71d6528a6fb1c580e2a368a389cf7",
 ]
 libpetab = [
     "petab @ git+https://github.com/petab-dev/libpetab-python.git@main",
