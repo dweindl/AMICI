@@ -51,7 +51,7 @@ jobs:
     - name: Install test dependencies
       run: python3 -m pip install --upgrade --group python/sdist/pyproject.toml:fiddy
 
-    - run: AMICI_PARALLEL_COMPILE="" ./scripts/run-SBMLTestsuite.sh ${{ matrix.cases }}
+    - run: AMICI_FD_DUMP_DIR=${{ github.workspace }}/fd_dump AMICI_PARALLEL_COMPILE="" ./scripts/run-SBMLTestsuite.sh ${{ matrix.cases }}
     - run: mv tests/sbml/amici-semantic-results/results.json tests/sbml/amici-semantic-results/results_${{ matrix.cases }}.json
 
     - name: "Upload artifact: SBML semantic test suite results"
@@ -59,6 +59,13 @@ jobs:
       with:
         name: amici-semantic-results-${{ matrix.cases }}
         path: tests/sbml/amici-semantic-results
+
+    - name: "Upload artifact: fiddy results"
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: fd-dump-sbml-${{ matrix.cases }}
+        path: fd_dump
 
     - name: Codecov SBMLSuite
       if: (github.event_name == 'pull_request' || github.repository_owner == 'AMICI-dev') && github.actor != 'dependabot[bot]'
